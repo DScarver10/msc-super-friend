@@ -1,0 +1,112 @@
+[
+  {
+    "pub": "AFI 41-102",
+    "title": "MEDICAL EXPENSE AND PERFORMANCE REPORTING SYSTEM (MEPRS) FOR FIXED MILITARY MEDICAL AND DENTAL TREATMENT FACILITIES",
+    "msc_functional_area": "RMO",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.e-publishing.af.mil/production/1/af_sg/publication/afi41-102/afi41-102.pdf"
+      }
+    ]
+  },
+  {
+    "pub": "AFI 41-104",
+    "title": "PROFESSIONAL BOARD AND NATIONAL CERTIFICATION EXAMINATIONS",
+    "msc_functional_area": "Quality",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.epublishing.af.mil/production/1/af_sg/publication/afi41-104/afi41-104.pdf"
+      }
+    ]
+  },
+  {
+    "pub": "AFI 41-105",
+    "title": "MEDICAL TRAINING PROGRAMS",
+    "msc_functional_area": "Readiness",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.e-publishing.af.mil/production/1/af_sg/publication/afi41-105/afi41-105.pdf"
+      }
+    ]
+  },
+  {
+    "pub": "AFI 41-106",
+    "title": "MEDICAL READINESS PROGRAM",
+    "msc_functional_area": "Readiness",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.e-publishing.af.mil/production/1/af_sg/publication/afi41-106/dafi41-106.pdf"
+      }
+    ]
+  },
+  {
+    "pub": "AFI 41-109",
+    "title": "SPECIAL AND INCENTIVE PAY FOR HEALTH PROFESSIONS OFFICERS",
+    "msc_functional_area": "RMO",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.e-publishing.af.mil/production/1/af_sg/publication/afi41-109/afi41-109.pdf"
+      }
+    ]
+  },
+  {
+    "pub": "AFI 41-117",
+    "title": "MEDICAL SERVICE OFFICER EDUCATION",
+    "msc_functional_area": "Readiness",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.e-publishing.af.mil/production/1/af_sg/publication/afi41-117/afi41-117.pdf"
+      }
+    ]
+  },
+  {
+    "pub": "DAFI 41-230",
+    "title": "MEDICAL LOGISTICS SUPPORT",
+    "msc_functional_area": "MedLog",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.e-publishing.af.mil/production/1/af_sg/publication/dafi41-230/dafi41-230.pdf"
+      }
+    ]
+  },
+  {
+    "pub": "AFMAN 41-108",
+    "title": "TRAINING AFFILIATION AGREEMENT PROGRAM",
+    "msc_functional_area": "Readiness",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.e-publishing.af.mil/production/1/af_sg/publication/afman41-108/afman41-108.pdf"
+      }
+    ]
+  },
+  {
+    "pub": "AFMAN 41-210",
+    "title": "TRICARE OPERATIONS AND PATIENT ADMINISTRATION 59 MDW",
+    "msc_functional_area": "TOPA",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.e-publishing.af.mil/production/1/59mdw/publication/afman41-210_59mdwsup/afman41-210_59mdwsup.pdf"
+      }
+    ]
+  },
+  {
+    "pub": "DAFMAN 41-210",
+    "title": "PATIENT ADMINISTRATION SUPPORT",
+    "msc_functional_area": "TOPA",
+    "official_links": [
+      {
+        "label": "Official Publication (e-Publishing)",
+        "url": "https://static.e-publishing.af.mil/production/1/af_sg/publication/dafman41-210/dafman41-210.pdf"
+      }
+    ]
+  }
+]

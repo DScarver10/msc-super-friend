@@ -1,0 +1,117 @@
+[
+  {
+    "title": "Accession Timeline (Your Personal Gantt)",
+    "phase": "Start",
+    "summary": "Build a simple timeline from today to accession milestones with deadlines and owners.",
+    "checklist": [
+      "List required documents and suspense dates.",
+      "Assign an owner (you, recruiter, unit) for each item.",
+      "Review weekly until accession complete."
+    ],
+    "links": []
+  },
+  {
+    "title": "Fitness & Medical Readiness Plan",
+    "phase": "Start",
+    "summary": "Ensure fitness and readiness items won’t delay accession or training.",
+    "checklist": [
+      "Confirm medical requirements and any waivers early.",
+      "Start an 8–12 week fitness plan aligned to standards.",
+      "Track appointments and paperwork in one place."
+    ],
+    "links": []
+  },
+  {
+    "title": "Documents Folder (One Source of Truth)",
+    "phase": "Admin",
+    "summary": "Avoid last-minute scrambles by building a single, organized folder structure.",
+    "checklist": [
+      "Create a folder with subfolders: IDs, transcripts, forms, correspondence.",
+      "Use consistent filenames with dates (YYYY-MM-DD).",
+      "Back up to a secure personal location."
+    ],
+    "links": []
+  },
+  {
+    "title": "Interview Prep: Role + Why MSC + Impact",
+    "phase": "Selection",
+    "summary": "Be able to explain MSC value in 30 seconds with a concrete example.",
+    "checklist": [
+      "Draft a 30-second role statement.",
+      "Prepare 3 leadership examples with outcomes.",
+      "Practice answering: 'Why MSC?' and 'Why now?'"
+    ],
+    "links": [
+      { "label": "AFMS MSC Overview", "url": "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/" }
+    ]
+  },
+  {
+    "title": "Uniforms: Don’t Wait Until the Last Week",
+    "phase": "Prep",
+    "summary": "Uniform delays are common; build buffer time.",
+    "checklist": [
+      "Identify required uniforms for initial training.",
+      "Schedule measurements early.",
+      "Plan for tailoring time."
+    ],
+    "links": []
+  },
+  {
+    "title": "Pay & Benefits: Validate Early",
+    "phase": "Admin",
+    "summary": "Know what to expect and who to contact if something is off.",
+    "checklist": [
+      "Confirm pay entry baseline and special pay eligibility (if applicable).",
+      "Save points of contact.",
+      "Track first LES and verify accuracy."
+    ],
+    "links": []
+  },
+  {
+    "title": "PCS/Travel Planning Checklist",
+    "phase": "Move",
+    "summary": "Reduce friction by organizing travel and reporting instructions early.",
+    "checklist": [
+      "Confirm reporting location/time and required documents.",
+      "Plan lodging and travel buffer.",
+      "Print/save critical emails and orders."
+    ],
+    "links": []
+  },
+  {
+    "title": "Professional Reading (Minimal, High Yield)",
+    "phase": "Prep",
+    "summary": "Read a small set of authoritative sources; avoid internet rabbit holes.",
+    "checklist": [
+      "Review official MSC overview and mission.",
+      "Skim DHA policy categories relevant to admin/ops.",
+      "Identify 3 policies to deep read once assigned."
+    ],
+    "links": [
+      { "label": "DHA Policies", "url": "https://www.health.mil/Reference-Center/Policies" }
+    ]
+  },
+  {
+    "title": "Mentorship Map",
+    "phase": "Prep",
+    "summary": "Identify 2–3 mentors (MSC, clinical, enlisted) and set a cadence.",
+    "checklist": [
+      "Ask one MSC officer for monthly mentorship.",
+      "Find a senior enlisted mentor for ops perspective.",
+      "Prepare questions before each touchpoint."
+    ],
+    "links": []
+  },
+  {
+    "title": "First 30 Days Plan (Win Trust Early)",
+    "phase": "Arrival",
+    "summary": "Show you are there to learn fast and deliver value.",
+    "checklist": [
+      "Schedule key stakeholder intros in week 1.",
+      "Ask: 'What’s the #1 pain point I can help with?'",
+      "Deliver one small, visible improvement by day 30."
+    ],
+    "links": []
+  }
+]
+

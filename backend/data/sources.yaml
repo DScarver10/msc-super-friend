@@ -1,0 +1,19 @@
+sources:
+  - name: dodi
+    type: html
+    items:
+      - title: "DoDI Issuances Directory"
+        url: "https://www.esd.whs.mil/Directives/issuances/dodi/"
+
+  - name: dha
+    type: html
+    items:
+      - title: "DHA Policies Directory"
+        url: "https://www.health.mil/Reference-Center/Policies"
+
+  - name: afms_msc
+    type: html
+    items:
+      - title: "AFMS Medical Service Corps Overview"
+        url: "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/"
+
