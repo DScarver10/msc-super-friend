@@ -203,7 +203,7 @@ def render_tags(tags: list[str] | None):
     tags = tags or []
     if not tags:
         return ""
-    safe = [f"<span class='sf-tag'>{html.escape(t)}</span>" for t in tags[:6]]
+    safe = [f"<span class='sf-tag'>{html.escape(sanitize_display_text(t))}</span>" for t in tags[:6]]
     return f"<div class='sf-tags'>{''.join(safe)}</div>"
 
 
@@ -215,6 +215,24 @@ def sanitize_display_text(x: str | None) -> str:
     raw = html.unescape((x or "").strip())
     no_tags = re.sub(r"<[^>]+>", "", raw)
     return no_tags.strip()
+
+
+def to_sentence_case(text: str) -> str:
+    cleaned = sanitize_display_text(text)
+    letters = [c for c in cleaned if c.isalpha()]
+    if not letters:
+        return cleaned
+
+    result = cleaned
+    if all(c.isupper() for c in letters):
+        lowered = cleaned.lower()
+        result = lowered[:1].upper() + lowered[1:]
+
+    # Preserve common acronyms
+    acronyms = ["AFI", "DHA", "DOD", "AFMS", "MSC"]
+    for ac in acronyms:
+        result = re.sub(rf"\b{ac.lower()}\b", ac, result, flags=re.IGNORECASE)
+    return result
 
 
 def make_open_token(kind: str, idx: int) -> str:
@@ -311,15 +329,11 @@ render_app_header()
 try:
     health = get_health()
     sources_list = health.get("sources", [])
-    st.caption(
-        f"Backend: OK • Indexed: {health.get('indexed_as_of')} • "
-        f"Chunks: {health.get('num_chunks')} • "
-        f"Sources: {', '.join(sources_list) if sources_list else 'None'}"
-    )
+    # Backend status text intentionally hidden from UI.
 except Exception:
     health = {"sources": [], "indexed_as_of": "unknown", "num_chunks": 0}
     sources_list = []
-    st.caption("Backend: Offline • Ask Super Friend may be in offline mode. You can still browse doctrine.")
+    # Backend status text intentionally hidden from UI.
 
 # ----------------------------
 # Sidebar (RAG controls)
@@ -368,7 +382,7 @@ if debug_enabled:
 # ----------------------------
 # Tabs
 # ----------------------------
-tab1, tab2, tab3 = st.tabs(["Doctrine Library", "MSC Toolkit", "Ask Super Friend"])
+tab1, tab2, tab3 = st.tabs(["📚 Doctrine Library", "🧰 MSC Toolkit", "💬 Ask Super Friend"])
 
 # ----------------------------
 # Query param routing (full-row clickable)
@@ -393,7 +407,7 @@ if open_param:
 # ----------------------------
 with tab1:
     st.subheader("Doctrine Library")
-    st.caption("A verified, searchable library of DHA and AFI Health Services publications.")
+    st.caption("Quick access to trusted DHA and AFI health services guidance.")
 
     afi = load_afi_seed()
     if not afi:
@@ -424,7 +438,7 @@ with tab1:
         if 0 <= idx < len(afi):
             a = afi[idx]
             pub = sanitize_display_text(a.get("pub"))
-            title = sanitize_display_text(a.get("title"))
+            title = to_sentence_case(a.get("title") or "")
             st.markdown(f"### {pub} — {title}" if pub else f"### {title}")
 
             why = (a.get("why_it_matters") or "").strip()
@@ -435,7 +449,7 @@ with tab1:
             if use_cases:
                 st.markdown("#### Use cases")
                 for uc in use_cases[:8]:
-                    st.markdown(f"- {uc}")
+                    st.markdown(f"- {sanitize_display_text(uc)}")
 
             notes = (a.get("notes") or "").strip()
             if notes:
@@ -463,7 +477,7 @@ with tab1:
         for i, a in enumerate(afi):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
             pub = sanitize_display_text(a.get("pub"))
-            title = sanitize_display_text(a.get("title"))
+            title = to_sentence_case(a.get("title") or "")
             display_title = f"{pub} — {title}" if pub else title
             summary = sanitize_display_text(a.get("why_it_matters"))
             tags_html = render_tags(a.get("tags", []) or [])
@@ -496,19 +510,28 @@ with tab1:
 # ----------------------------
 with tab2:
     st.subheader("MSC Toolkit")
-    st.caption("Helpful documents at your fingertips.")
-
-    # Official MSC landing page
-    st.markdown("### Official MSC Landing Page")
-    st.link_button("Open AFMS Medical Service Corps Page", AFMS_MSC_URL, use_container_width=True)
-
-    st.divider()
+    st.caption("Helpful resources, right when you need them.")
 
     try:
         toolkit = load_json("toolkit.json")
     except FileNotFoundError:
         st.error("Missing file: frontend/content/toolkit.json")
         st.stop()
+    landing_card = {
+        "title": "Official MSC Landing Page",
+        "summary": "AFMS Medical Service Corps page",
+        "type": "Official",
+        "tags": ["AFMS", "MSC"],
+        "official_links": [{"label": "Open page", "url": AFMS_MSC_URL}],
+    }
+    dha_strategy_card = {
+        "title": "DHA Strategy",
+        "summary": "Defense Health Agency strategy page",
+        "type": "Official",
+        "tags": ["DHA", "Strategy"],
+        "official_links": [{"label": "Open page", "url": "https://www.dha.mil/About-DHA/DHA-Strategy"}],
+    }
+    toolkit = [landing_card, dha_strategy_card] + (toolkit or [])
 
     q2 = st.text_input(
         "",
@@ -530,12 +553,12 @@ with tab2:
         idx = st.session_state.open_idx
         if 0 <= idx < len(toolkit):
             t = toolkit[idx]
-            title = sanitize_display_text(t.get("title"))
+            title = to_sentence_case(t.get("title") or "")
             st.markdown(f"### {title}")
 
             doc_type = (t.get("type") or "").strip()
             if doc_type:
-                st.caption(f"Type: {sanitize_display_text(doc_type)}")
+                st.caption(f"Type: {to_sentence_case(doc_type)}")
 
             summary = (t.get("summary") or "").strip()
             if summary:
@@ -560,10 +583,10 @@ with tab2:
         # LIST VIEW
         for i, t in enumerate(toolkit):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
-            title = sanitize_display_text(t.get("title"))
+            title = to_sentence_case(t.get("title") or "")
             summary = sanitize_display_text(t.get("summary"))
             tags_html = render_tags(t.get("tags", []) or [])
-            doc_type = sanitize_display_text(t.get("type"))
+            doc_type = to_sentence_case(t.get("type") or "")
 
             token = make_open_token("toolkit", i)
             official_links = t.get("official_links", []) or []
@@ -593,13 +616,12 @@ with tab2:
 # ----------------------------
 with tab3:
     st.subheader("Ask Super Friend")
-    st.caption("Answers are generated only from indexed sources. Citations are always shown.")
+    st.caption("Citations are always shown.")
 
     # Welcome panel (visual polish + guidance)
     render_welcome_panel()
 
-    if health.get("num_chunks", 0) == 0 or health.get("indexed_as_of") in ("not indexed", "unknown"):
-        st.caption("Status: Index not built yet. Use “Rebuild Index (Ingest)” in the sidebar.")
+    # Status line intentionally hidden from UI.
 
     with st.form("ask_form"):
         question = st.text_area(
@@ -612,7 +634,7 @@ with tab3:
         with colA:
             run = st.form_submit_button("Get Answer", type="primary", use_container_width=True)
         with colB:
-            st.markdown("**Trust rules:** citations always shown • refusal if evidence is weak • no PHI/PII")
+            pass
 
     if run and question.strip():
         with st.spinner("Retrieving evidence and generating a grounded response..."):
@@ -638,7 +660,7 @@ with tab3:
                         st.caption("No citations returned.")
                     else:
                         for i, c in enumerate(citations, start=1):
-                            title = c.get("title", "Untitled")
+                            title = to_sentence_case(c.get("title", "Untitled") or "")
                             url = c.get("url", "")
                             score = float(c.get("score", 0.0))
                             source = c.get("source", "")
@@ -651,11 +673,14 @@ with tab3:
                                 st.link_button("Open source", url, use_container_width=True)
 
             except requests.HTTPError as e:
-                # Keep errors calm (no giant raw JSON)
-                st.caption("Request failed. Backend may be offline.")
-                try:
-                    st.code(e.response.text)
-                except Exception:
-                    st.code(str(e))
-            except Exception:
-                st.caption("Unexpected error. Backend may be offline.")
+                st.caption("Something went wrong. The service may be temporarily unavailable.")
+                print(f"Ask request failed: {e}")
+            except Exception as e:
+                st.caption("Something went wrong. The service may be temporarily unavailable.")
+                print(f"Ask request failed: {e}")
+
+# ----------------------------
+# Footer
+# ----------------------------
+st.divider()
+st.caption("Built for MSCs | Version 1.0")

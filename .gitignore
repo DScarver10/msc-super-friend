@@ -19,3 +19,6 @@ backend/data/chroma*
 
 # OS
 .DS_Store
+backend/data/index 
+frontend/streamlit/secrets.toml 
+.env 

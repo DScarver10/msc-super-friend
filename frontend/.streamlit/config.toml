@@ -1,7 +1,7 @@
 [theme]
 # navy palette + clean professional typography
-primaryColor = "#1B3A57"              # deep blue
-backgroundColor = "#F7F5F2"           # soft warm white
-secondaryBackgroundColor = "#E9EDF3"  # light blue-gray
+primaryColor = "#1B3F72"              # Air Force blue
+backgroundColor = "#F2F4F6"           # soft light gray
+secondaryBackgroundColor = "#2A3442"  # dark blue-gray cards
 textColor = "#1E2A32"                 # soft charcoal
 font = "sans serif"
