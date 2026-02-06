@@ -82,6 +82,58 @@ st.markdown(
         background: rgba(27,63,114,.06);
         border-color: rgba(27,63,114,.35);
       }
+      .sf-table{
+        border: 1px solid #CBD5E1;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .sf-table-row{
+        margin: 0;
+        padding: 0;
+        border-bottom: 1px solid #CBD5E1;
+      }
+      .sf-table-row:last-child{
+        border-bottom: none;
+      }
+      .sf-table-row.even{
+        background: #F2F4F6;
+      }
+      .sf-table-row.odd{
+        background: #7A0019;
+      }
+      .sf-table-row.odd [data-testid="stLinkButton"] > a,
+      .sf-table-row.odd [data-testid="stDownloadButton"] > button{
+        color: #FFFFFF !important;
+      }
+      .sf-table-row [data-testid="stLinkButton"] > a,
+      .sf-table-row [data-testid="stDownloadButton"] > button{
+        border-radius: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 10px 12px !important;
+        text-align: left !important;
+      }
+      .sf-table-tool_list [data-testid="stLinkButton"] > a,
+      .sf-table-tool_list [data-testid="stDownloadButton"] > button{
+        font-weight: 600;
+      }
+      .tool-card-desc{
+        font-size: 13px;
+        color: #6b7280;
+        margin-top: 4px;
+      }
+      .sf-tag{
+        display: inline-block;
+        margin: 4px 12px 8px 12px;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: 500;
+        border-radius: 999px;
+        background: rgba(0,0,0,0.08);
+        color: #374151;
+      }
       .sf-header{
         border: 2px solid #0B3C5D !important;
         border-radius: 14px !important;
@@ -119,10 +171,13 @@ st.markdown(
         color: #111111;
       }
       .sf-chat-wrap textarea{
-        color: #111111 !important;
+        color: #000000 !important;
+        font-size: 15px !important;
       }
       .sf-chat-wrap textarea::placeholder{
-        color: rgba(11,15,20,0.45) !important;
+        color: #6b7280 !important;
+        font-size: 14px !important;
+        opacity: 1 !important;
       }
       .sf-doclink{
         display: inline-block;
@@ -356,6 +411,38 @@ def render_card_button(
                 st.link_button(label, url, key=key)
             except TypeError:
                 st.link_button(label, url)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_table_list(rows: list[dict], list_id: str) -> None:
+    st.markdown(f'<div class="sf-table sf-table-{list_id}">', unsafe_allow_html=True)
+    for i, row in enumerate(rows):
+        row_class = "odd" if i % 2 else "even"
+        st.markdown(f'<div class="sf-table-row {row_class}">', unsafe_allow_html=True)
+        if row.get("data") is not None:
+            st.download_button(
+                row["label"],
+                data=row["data"],
+                file_name=row["file_name"],
+                mime=row["mime"],
+                use_container_width=True,
+                key=f"{list_id}_dl_{i}",
+            )
+        else:
+            try:
+                st.link_button(row["label"], row["url"], use_container_width=True, key=f"{list_id}_ln_{i}")
+            except TypeError:
+                try:
+                    st.link_button(row["label"], row["url"], key=f"{list_id}_ln_{i}")
+                except TypeError:
+                    st.link_button(row["label"], row["url"])
+        desc = row.get("desc") or ""
+        if desc:
+            st.markdown(f"<div class='tool-card-desc'>{escape_html(strip_html(desc))}</div>", unsafe_allow_html=True)
+        tag = row.get("tag") or ""
+        if tag:
+            st.markdown(f"<span class='sf-tag'>{escape_html(strip_html(tag))}</span>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -681,6 +768,7 @@ with tab1:
 
     else:
         # LIST VIEW (plain text cards)
+        rows = []
         for i, a in enumerate(afi):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
             border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
@@ -695,31 +783,21 @@ with tab1:
             local_path = (APP_ROOT / "docs" / Path(raw_link).name) if is_local_doc(raw_link) else None
             has_local_file = bool(local_path and local_path.exists())
 
-            parts = [display_title]
-            if summary:
-                parts.append(summary)
-            if tag_label:
-                parts.append(f"Tag: {tag_label}")
-            label = "\n".join(parts)
+            label = strip_html(display_title)
 
             if external_url:
-                render_card_button(
-                    label=label,
-                    bg=bg,
-                    border_color=border_color,
-                    key=f"doc_card_{i}",
-                    url=external_url,
-                )
+                rows.append({"label": label, "url": external_url, "tag": tag_label})
             elif has_local_file:
-                render_card_button(
-                    label=label,
-                    bg=bg,
-                    border_color=border_color,
-                    key=f"doc_card_{i}",
-                    data=load_file_bytes(local_path),
-                    file_name=local_path.name,
-                    mime=mime_for_path(local_path),
+                rows.append(
+                    {
+                        "label": label,
+                        "tag": tag_label,
+                        "data": load_file_bytes(local_path),
+                        "file_name": local_path.name,
+                        "mime": mime_for_path(local_path),
+                    }
                 )
+        render_table_list(rows, "doc_list")
 
 # ----------------------------
 # Tab 2: MSC Toolkit
@@ -797,6 +875,7 @@ with tab2:
 
     else:
         # LIST VIEW
+        rows = []
         for i, t in enumerate(toolkit):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
             border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
@@ -809,30 +888,21 @@ with tab2:
             external_url = primary_link if is_url(primary_link) else ""
             local_path = (APP_ROOT / "docs" / Path(primary_link).name) if is_local_doc(primary_link) else None
             has_local_file = bool(local_path and local_path.exists())
-            parts = [title]
-            if summary:
-                parts.append(summary)
-            if doc_type:
-                parts.append(f"Tag: {doc_type}")
-            label = "\n".join(parts)
+            label = strip_html(title)
             if external_url:
-                render_card_button(
-                    label=label,
-                    bg=bg,
-                    border_color=border_color,
-                    key=f"tool_card_{i}",
-                    url=external_url,
-                )
+                rows.append({"label": label, "url": external_url, "tag": doc_type, "desc": summary})
             elif has_local_file:
-                render_card_button(
-                    label=label,
-                    bg=bg,
-                    border_color=border_color,
-                    key=f"tool_card_{i}",
-                    data=load_file_bytes(local_path),
-                    file_name=local_path.name,
-                    mime=mime_for_path(local_path),
+                rows.append(
+                    {
+                        "label": label,
+                        "tag": doc_type,
+                        "desc": summary,
+                        "data": load_file_bytes(local_path),
+                        "file_name": local_path.name,
+                        "mime": mime_for_path(local_path),
+                    }
                 )
+        render_table_list(rows, "tool_list")
 
 # ----------------------------
 # Tab 3: Ask Super Friend
