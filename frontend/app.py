@@ -349,7 +349,13 @@ def render_card_button(
             key=key,
         )
     elif url:
-        st.link_button(label, url, use_container_width=True, key=key)
+        try:
+            st.link_button(label, url, use_container_width=True, key=key)
+        except TypeError:
+            try:
+                st.link_button(label, url, key=key)
+            except TypeError:
+                st.link_button(label, url)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
