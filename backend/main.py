@@ -9,6 +9,7 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from starlette.responses import FileResponse
 
 from backend.config import load_settings
 from backend.logging_setup import setup_logging
@@ -34,6 +35,9 @@ INDEX_STATE = {"indexed_as_of": "not indexed", "num_chunks": 0, "sources": []}
 
 FEEDBACK_PATH = Path("backend/data/feedback.jsonl")
 FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+DOCS_DIR = Path(getattr(settings, "docs_dir", "")) if getattr(settings, "docs_dir", "") else Path(__file__).resolve().parents[1] / "frontend" / "docs"
+DOCS_DIR = DOCS_DIR.resolve()
 
 
 class FeedbackEvent(BaseModel):
@@ -88,6 +92,24 @@ def health():
         "num_chunks": INDEX_STATE["num_chunks"],
         "sources": INDEX_STATE["sources"],
     }
+
+
+@app.get("/docs/{file_path:path}")
+def serve_docs(file_path: str):
+    # Prevent path traversal
+    if ".." in Path(file_path).parts:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    resolved = (DOCS_DIR / file_path).resolve()
+    if not str(resolved).startswith(str(DOCS_DIR)):
+        raise HTTPException(status_code=400, detail="Invalid path")
+    if not resolved.exists() or not resolved.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    headers = {"Content-Disposition": f'inline; filename="{resolved.name}"'}
+    return FileResponse(
+        path=str(resolved),
+        media_type="application/pdf",
+        headers=headers,
+    )
 
 
 @app.post("/ingest")

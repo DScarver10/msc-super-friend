@@ -26,6 +26,7 @@ SEED_CSV_PATH = APP_ROOT / "content" / "afi41_seed.csv"
 
 AFMS_MSC_URL = "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/"
 BACKEND_URL = st.secrets.get("BACKEND_URL", "http://127.0.0.1:8000")
+BACKEND_URL_CONFIGURED = "BACKEND_URL" in st.secrets
 
 # ----------------------------
 # Streamlit page config
@@ -57,6 +58,10 @@ st.markdown(
       .sf-title, .sf-summary { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
       .sf-title { -webkit-line-clamp: 2; }
       .sf-summary { -webkit-line-clamp: 3; }
+      .sf-card-link{ display:block; text-decoration:none !important; color: inherit !important; }
+      .sf-card-title{ display:-webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+      .sf-card-desc{ display:-webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+      .sf-card-chevron{ color: rgba(30,42,50,0.65); font-size: 22px; line-height: 1; padding-top: 2px; margin-left:auto; }
       .sf-header{
         border: 2px solid #0B3C5D !important;
         border-radius: 14px !important;
@@ -296,6 +301,42 @@ def strip_html(x: str | None) -> str:
     return re.sub(r"<[^>]+>", "", raw).strip()
 
 
+def escape_html(x: str | None) -> str:
+    return html.escape((x or "").strip(), quote=True)
+
+
+def render_clickable_card(
+    href: str,
+    title: str,
+    summary: str,
+    pill_text: str,
+    bg: str,
+    border_color: str,
+) -> None:
+    safe_title = escape_html(strip_html(title))
+    safe_summary = escape_html(strip_html(summary))
+    safe_pill = escape_html(strip_html(pill_text))
+    card_inner = f"""
+        <div class="sf-row" style="background:{bg}; border-color:{border_color};">
+          <div>{f"<div class='sf-badge sf-card-pill'>{safe_pill}</div>" if safe_pill else ""}</div>
+          <div style="flex:1;">
+            <div class="sf-card-title">{safe_title}</div>
+            {f"<div class='sf-card-desc'>{safe_summary}</div>" if safe_summary else ""}
+          </div>
+          <div class="sf-card-chevron">›</div>
+        </div>
+    """
+    if href:
+        card_html = f"""
+            <a class="sf-card-link" href="{href}" target="_blank" rel="noopener noreferrer">
+              {card_inner}
+            </a>
+        """
+    else:
+        card_html = card_inner
+    st.markdown(card_html, unsafe_allow_html=True)
+
+
 def is_url(value: str | None) -> bool:
     if not value:
         return False
@@ -307,6 +348,31 @@ def resolve_local_path(value: str) -> Path | None:
         return None
     # Treat relative paths as frontend-local
     return (APP_ROOT / value).resolve()
+
+
+def build_doc_url(item: dict) -> str:
+    # Prefer official_links if present
+    official_links = item.get("official_links", []) or []
+    if official_links:
+        raw = official_links[0].get("url", "") or ""
+        if is_url(raw):
+            return raw
+        if raw:
+            if BACKEND_URL_CONFIGURED:
+                return f"{BACKEND_URL}/docs/{quote(Path(raw).name)}"
+            return f"/docs/{quote(Path(raw).name)}"
+
+    # Fallbacks for local file fields
+    for key in ("path", "local_path", "file"):
+        raw = item.get(key, "") or ""
+        if raw:
+            if is_url(raw):
+                return raw
+            if BACKEND_URL_CONFIGURED:
+                return f"{BACKEND_URL}/docs/{quote(Path(raw).name)}"
+            return f"/docs/{quote(Path(raw).name)}"
+
+    return ""
 
 
 def load_file_bytes(path: Path) -> bytes:
@@ -433,9 +499,11 @@ render_app_header()
 # ----------------------------
 try:
     health = get_health()
+    BACKEND_OK = True
     sources_list = health.get("sources", [])
     # Backend status text intentionally hidden from UI.
 except Exception:
+    BACKEND_OK = False
     health = {"sources": [], "indexed_as_of": "unknown", "num_chunks": 0}
     sources_list = []
     # Backend status text intentionally hidden from UI.
@@ -586,30 +654,27 @@ with tab1:
             title = to_sentence_case(a.get("title") or "")
             display_title = f"{pub} — {title}" if pub else title
             summary = strip_html(a.get("why_it_matters"))
-            tags_html = render_tags([strip_html(t) for t in (a.get("tags", []) or [])])
+            tags_html = ""
 
-            token = make_open_token("afi", i)
-            official_links = a.get("official_links", []) or []
-            external_url = official_links[0].get("url") if official_links else ""
-            href = external_url or ("?open=" + quote(token))
-            target = ' target="_blank" rel="noopener"' if external_url else ""
-
-            st.markdown(
-                f"""
-                <a class="sf-rowlink" href="{href}"{target}>
-                  <div class="sf-row" style="background:{bg}; border-color:{border_color};">
-                    <div>{f"<div class='sf-badge'>{pub}</div>" if pub else ""}</div>
-                    <div style="flex:1;">
-                      <div class="sf-title">{display_title}</div>
-                      {f"<div class='sf-summary'>{summary}</div>" if summary else ""}
-                      {tags_html}
-                    </div>
-                    <div class="sf-chev">›</div>
-                  </div>
-                </a>
-                """,
-                unsafe_allow_html=True,
-            )
+            doc_url = build_doc_url(a)
+            if doc_url and (BACKEND_OK or is_url(doc_url)):
+                render_clickable_card(
+                    href=doc_url,
+                    title=display_title,
+                    summary=summary,
+                    pill_text=pub,
+                    bg=bg,
+                    border_color=border_color,
+                )
+            elif doc_url:
+                render_clickable_card(
+                    href="",
+                    title=display_title,
+                    summary=summary,
+                    pill_text=pub,
+                    bg=bg,
+                    border_color=border_color,
+                )
 
 # ----------------------------
 # Tab 2: MSC Toolkit
@@ -692,7 +757,6 @@ with tab2:
             border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
             title = to_sentence_case(t.get("title") or "")
             summary = strip_html(t.get("summary"))
-            tags_html = ""
             doc_type = to_sentence_case(t.get("type") or "")
 
             official_links = t.get("official_links", []) or []
@@ -700,32 +764,44 @@ with tab2:
             external_url = primary_link if is_url(primary_link) else ""
             local_path = resolve_local_path(primary_link) if primary_link and not external_url else None
             has_local_file = bool(local_path and local_path.exists())
-            target = ' target="_blank" rel="noopener"' if external_url else ""
-
-            card_html = f"""
-                <div class="sf-row" style="background:{bg}; border-color:{border_color};">
-                  <div>{f"<div class='sf-badge'>{doc_type}</div>" if doc_type else ""}</div>
-                  <div style="flex:1;">
-                    <div class="sf-title">{title}</div>
-                    {f"<div class='sf-summary'>{summary}</div>" if summary else ""}
-                    {tags_html}
-                  </div>
-                  <div class="sf-chev">›</div>
-                </div>
-            """
-
-            st.markdown(card_html, unsafe_allow_html=True)
             if external_url:
-                st.markdown(
-                    f'<a class="sf-doclink" href="{external_url}" target="_blank" rel="noopener noreferrer">Open link</a>',
-                    unsafe_allow_html=True,
+                render_clickable_card(
+                    href=external_url,
+                    title=title,
+                    summary=summary,
+                    pill_text=doc_type,
+                    bg=bg,
+                    border_color=border_color,
                 )
             elif has_local_file:
-                file_href = f"/docs/{quote(local_path.name)}"
-                st.markdown(
-                    f'<a class="sf-doclink" href="{file_href}" target="_blank" rel="noopener noreferrer">Open document</a>',
-                    unsafe_allow_html=True,
-                )
+                if BACKEND_OK and BACKEND_URL_CONFIGURED:
+                    file_href = f"{BACKEND_URL}/docs/{quote(local_path.name)}"
+                    render_clickable_card(
+                        href=file_href,
+                        title=title,
+                        summary=summary,
+                        pill_text=doc_type,
+                        bg=bg,
+                        border_color=border_color,
+                    )
+                else:
+                    render_clickable_card(
+                        href="",
+                        title=title,
+                        summary=summary,
+                        pill_text=doc_type,
+                        bg=bg,
+                        border_color=border_color,
+                    )
+                    data = load_file_bytes(local_path)
+                    st.download_button(
+                        "Download file",
+                        data=data,
+                        file_name=local_path.name,
+                        mime=mime_for_path(local_path),
+                        use_container_width=True,
+                        key=f"toolkit_download_{i}",
+                    )
 
 # ----------------------------
 # Tab 3: Ask Super Friend
