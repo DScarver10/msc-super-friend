@@ -10,10 +10,12 @@ from .retrieve import Evidence
 def _build_context_block(evidence: List[Evidence], max_chars_per_chunk: int = 1200) -> str:
     blocks = []
     for i, e in enumerate(evidence, start=1):
-        excerpt = e.text.strip().replace("\r", "\n")
+        raw_text = getattr(e, "text", None) or getattr(e, "excerpt", "")
+        excerpt = raw_text.strip().replace("\r", "\n")
         excerpt = excerpt[:max_chars_per_chunk]
+        source = getattr(e, "source", None) or getattr(e, "source_id", None) or getattr(e, "source_type", "unknown")
         blocks.append(
-            f"[E{i}] SOURCE={e.source}\nTITLE={e.title}\nURL={e.url}\nEXCERPT:\n{excerpt}\n"
+            f"[E{i}] SOURCE={source}\nTITLE={e.title}\nURL={e.url}\nEXCERPT:\n{excerpt}\n"
         )
     return "\n".join(blocks)
 

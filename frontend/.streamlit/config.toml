@@ -1,7 +1,7 @@
 [theme]
 # navy palette + clean professional typography
-primaryColor = "#0B1F3A"              # navy
-backgroundColor = "#FFFFFF"           # white
-secondaryBackgroundColor = "#F3F6FA"  # light gray-blue
-textColor = "#0F172A"                 # near-black
+primaryColor = "#1B3A57"              # deep blue
+backgroundColor = "#F7F5F2"           # soft warm white
+secondaryBackgroundColor = "#E9EDF3"  # light blue-gray
+textColor = "#1E2A32"                 # soft charcoal
 font = "sans serif"

@@ -4,6 +4,7 @@ import json
 import logging
 import time
 from pathlib import Path
+from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,17 +13,18 @@ from pydantic import BaseModel
 from backend.config import load_settings
 from backend.logging_setup import setup_logging
 from backend.rag.ingest import ingest
+from backend.rag.retrieve import retrieve
+from backend.rag.llm import generate_grounded_answer  # your existing function
 
 setup_logging()
 logger = logging.getLogger("backend")
 
 settings = load_settings()
-app = FastAPI(title="MSC Super Friend Backend", version=settings.app_version)
+app = FastAPI(title="MSC Super Friend Backend", version=getattr(settings, "app_version", "0.1.0"))
 
-# CORS for hosted Streamlit frontend (set tight later; permissive for MVP)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],   # tighten later
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,17 +32,12 @@ app.add_middleware(
 
 INDEX_STATE = {"indexed_as_of": "not indexed", "num_chunks": 0, "sources": []}
 
-# ----------------------------
-# Feedback storage
-# ----------------------------
-# Use an absolute path rooted at the repo so it behaves predictably on Render.
-REPO_ROOT = Path(__file__).resolve().parents[1]
-FEEDBACK_PATH = REPO_ROOT / "backend" / "data" / "feedback.jsonl"
+FEEDBACK_PATH = Path("backend/data/feedback.jsonl")
 FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 class FeedbackEvent(BaseModel):
-    vote: str  # "up" | "down" | "down_note"
+    vote: str                  # "up" | "down" | "down_note"
     question_id: str
     answer_id: str
     question: str
@@ -50,18 +47,34 @@ class FeedbackEvent(BaseModel):
     ts: int | None = None
 
 
+class AskRequest(BaseModel):
+    question: str
+    top_k: int = 5
+    allowed_sources: Optional[List[str]] = None
+
+
+class Citation(BaseModel):
+    evid_id: str
+    title: str
+    excerpt: str
+    url: Optional[str] = None
+    local_path: Optional[str] = None
+    page: Optional[int] = None
+    score: float
+
+
+class AskResponse(BaseModel):
+    question: str
+    answer: str
+    citations: List[Citation]
+    question_id: str
+    answer_id: str
+
+
 @app.get("/")
 def root():
-    """
-    Simple root route so the base Render URL doesn't return 404.
-    Helps sanity-check that the service is up without needing /docs.
-    """
-    return {
-        "ok": True,
-        "service": "msc-super-friend-backend",
-        "version": settings.app_version,
-        "message": "Backend is running. Visit /docs for API documentation.",
-    }
+    # helpful for Render: visiting service URL should not be "Not Found"
+    return {"ok": True, "service": "msc-super-friend-backend"}
 
 
 @app.get("/health")
@@ -69,69 +82,116 @@ def health():
     return {
         "ok": True,
         "service": "msc-super-friend-backend",
-        "model": settings.llm_model,
-        "version": settings.app_version,
+        "model": getattr(settings, "llm_model", "unknown"),
+        "version": getattr(settings, "app_version", "0.1.0"),
         "indexed_as_of": INDEX_STATE["indexed_as_of"],
         "num_chunks": INDEX_STATE["num_chunks"],
         "sources": INDEX_STATE["sources"],
     }
 
 
-@app.get("/version")
-def version():
-    return {
-        "backend_version": settings.app_version,
-        "indexed_as_of": INDEX_STATE["indexed_as_of"],
-        "num_chunks": INDEX_STATE["num_chunks"],
-    }
-
-
 @app.post("/ingest")
 def ingest_endpoint():
-    """
-    Builds/refreshes the vector index from sources.yaml + local toolkit docs.
-    """
     try:
+        sources_path = Path(settings.sources_path)
+        index_dir = Path(settings.index_dir)
+        toolkit_docs_dir = Path(settings.toolkit_docs_dir) if getattr(settings, "toolkit_docs_dir", None) else None
+
         result = ingest(
-            settings.sources_path,
-            settings.index_dir,
-            settings.toolkit_docs_dir,
+            sources_path=sources_path,
+            index_dir=index_dir,
+            toolkit_docs_dir=toolkit_docs_dir,
+            api_key=getattr(settings, "openai_api_key", None) or None,
+            embedding_model=getattr(settings, "embedding_model", "text-embedding-3-small"),
         )
+
         INDEX_STATE["indexed_as_of"] = result.indexed_as_of
         INDEX_STATE["num_chunks"] = result.num_chunks
         INDEX_STATE["sources"] = result.sources
-        return {
-            **INDEX_STATE,
-            "skipped_items": result.skipped_items,
-        }
+
+        return {**INDEX_STATE, "skipped_items": result.skipped_items}
+
     except Exception as e:
         logger.exception("Ingestion failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/ask", response_model=AskResponse)
+def ask(req: AskRequest):
+    """
+    UI-friendly ask endpoint:
+    - input: { question, top_k, allowed_sources }
+    - output: { answer, citations[] } with clickable urls
+    """
+    try:
+        index_dir = Path(settings.index_dir)
+
+        if not (index_dir / "faiss.index").exists() or not (index_dir / "meta.json").exists():
+            raise HTTPException(status_code=400, detail="Index not built yet. Run /ingest first.")
+
+        api_key = getattr(settings, "openai_api_key", None)
+        if not api_key:
+            raise HTTPException(status_code=500, detail="Missing OPENAI_API_KEY on backend.")
+
+        evidence = retrieve(
+            index_dir=index_dir,
+            question=req.question,
+            top_k=req.top_k,
+            allowed_sources=req.allowed_sources,
+            api_key=api_key,
+            embedding_model=getattr(settings, "embedding_model", "text-embedding-3-small"),
+        )
+
+        # Build an evidence pack for the LLM (IDs E1..)
+        # Your generate_grounded_answer already expects a list of Evidence with evid_id + excerpt.
+        answer_text = generate_grounded_answer(
+            api_key=api_key,
+            model=getattr(settings, "llm_model", "gpt-4o-mini"),
+            question=req.question,
+            evidence=evidence,
+        )
+
+        ts = int(time.time())
+        qid = f"q_{ts}"
+        aid = f"a_{ts}"
+
+        citations = [
+            Citation(
+                evid_id=e.evid_id,
+                title=e.title,
+                excerpt=e.excerpt,
+                url=e.url,
+                local_path=e.local_path,
+                page=e.page,
+                score=e.score,
+            )
+            for e in evidence
+        ]
+
+        return AskResponse(
+            question=req.question,
+            answer=answer_text,
+            citations=citations,
+            question_id=qid,
+            answer_id=aid,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Ask failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/feedback")
 def record_feedback(event: FeedbackEvent):
-    """
-    Records thumbs up/down feedback from the frontend.
-    Stored as append-only JSONL for later analysis.
-    """
-    payload = event.model_dump()
+    payload = event.dict()
     payload["ts"] = payload["ts"] or int(time.time())
 
     try:
         with FEEDBACK_PATH.open("a", encoding="utf-8") as f:
             f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-
-        logger.info(
-            "Feedback recorded",
-            extra={
-                "vote": payload.get("vote"),
-                "question_id": payload.get("question_id"),
-                "answer_id": payload.get("answer_id"),
-            },
-        )
         return {"ok": True}
-
     except Exception:
         logger.exception("Failed to record feedback")
         raise HTTPException(status_code=500, detail="Failed to record feedback")

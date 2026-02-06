@@ -1,8 +1,10 @@
 # frontend/app.py
 from __future__ import annotations
 
+import csv
 import html
 import json
+import re
 from base64 import b64encode
 from pathlib import Path
 from urllib.parse import quote
@@ -20,6 +22,7 @@ STYLES_DIR = APP_ROOT / "styles"
 
 MSC_BADGE_PATH = ASSETS_DIR / "msc.png"
 BOT_ICON_PATH = ASSETS_DIR / "bot.png"
+SEED_CSV_PATH = APP_ROOT / "content" / "afi41_seed.csv"
 
 AFMS_MSC_URL = "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/"
 BACKEND_URL = st.secrets.get("BACKEND_URL", "http://127.0.0.1:8000")
@@ -55,9 +58,45 @@ st.markdown(
 # ----------------------------
 # Helpers
 # ----------------------------
+@st.cache_data(show_spinner=False)
 def load_json(filename: str):
     path = CONTENT_DIR / filename
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+@st.cache_data(show_spinner=False)
+def load_csv_rows(path: Path) -> list[list[str]]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.reader(f)
+        return [row for row in reader]
+
+
+def load_afi_seed() -> list[dict]:
+    rows = load_csv_rows(SEED_CSV_PATH)
+    if not rows:
+        return []
+    header = rows[0]
+    items: list[dict] = []
+    for row in rows[1:]:
+        row_map = {header[i]: (row[i] if i < len(row) else "") for i in range(len(header))}
+        title = (row_map.get("title") or "").strip()
+        pub = (row_map.get("pub") or "").strip()
+        url = (row_map.get("official_publication_pdf") or "").strip()
+        tag = (row_map.get("msc_functional_area") or "").strip()
+        items.append(
+            {
+                "pub": pub,
+                "title": title,
+                "why_it_matters": "",
+                "tags": [tag] if tag else [],
+                "use_cases": [],
+                "notes": "",
+                "official_links": [{"label": "Open publication", "url": url}] if url else [],
+            }
+        )
+    return items
 
 
 def _data_uri(path: Path) -> str:
@@ -120,14 +159,6 @@ def render_app_header():
           <div class="sf-head-top">
             <div class="sf-brand">
               <div class="sf-mark">{logo_img}</div>
-              <div class="sf-titles">
-                <h1>MSC Super Friend</h1>
-                <div class="sub">Curated Reference Library</div>
-              </div>
-            </div>
-            <div class="sf-actions">
-              <div class="sf-iconbtn">🔍</div>
-              <div class="sf-iconbtn">☰</div>
             </div>
           </div>
         </div>
@@ -180,9 +211,16 @@ def safe_text(x: str | None) -> str:
     return html.escape((x or "").strip())
 
 
+def sanitize_display_text(x: str | None) -> str:
+    raw = html.unescape((x or "").strip())
+    no_tags = re.sub(r"<[^>]+>", "", raw)
+    return no_tags.strip()
+
+
 def make_open_token(kind: str, idx: int) -> str:
     # stable enough within this run; we’ll re-map each rerun from JSON
     return f"{kind}:{idx}"
+
 
 def render_feedback_controls(question: str, answer: str, citations: list[dict] | None):
     """
@@ -290,6 +328,10 @@ st.sidebar.header("RAG Controls")
 top_k = st.sidebar.slider("Evidence to retrieve (Top-K)", min_value=1, max_value=12, value=5)
 allowed = st.sidebar.multiselect("Limit sources (optional)", options=sources_list, default=[])
 
+if st.sidebar.button("Reload data", use_container_width=True):
+    st.cache_data.clear()
+    st.rerun()
+
 if st.sidebar.button("Rebuild Index (Ingest)", use_container_width=True):
     with st.spinner("Ingesting sources and rebuilding index..."):
         try:
@@ -303,6 +345,25 @@ if st.sidebar.button("Rebuild Index (Ingest)", use_container_width=True):
 
 st.sidebar.divider()
 st.sidebar.caption("Tip: Prefer direct official PDFs for maximum trust and speed.")
+
+debug_enabled = st.sidebar.checkbox("DEBUG")
+if debug_enabled:
+    st.sidebar.markdown("**CSV Debug**")
+    st.sidebar.code(str(SEED_CSV_PATH))
+    rows = load_csv_rows(SEED_CSV_PATH)
+    st.sidebar.markdown(f"Rows: `{len(rows)}`")
+    if rows:
+        header = rows[0]
+        title_idx = header.index("title") if "title" in header else -1
+        tail = rows[-5:] if len(rows) >= 6 else rows[1:]
+        titles = []
+        for r in tail:
+            if title_idx >= 0 and title_idx < len(r):
+                titles.append(r[title_idx])
+        if titles:
+            st.sidebar.markdown("Last 5 titles:")
+            for t in titles:
+                st.sidebar.markdown(f"- {t}")
 
 # ----------------------------
 # Tabs
@@ -334,10 +395,9 @@ with tab1:
     st.subheader("Doctrine Library")
     st.caption("A verified, searchable library of DHA and AFI Health Services publications.")
 
-    try:
-        afi = load_json("doctrine_afi41.json")
-    except FileNotFoundError:
-        st.error("Missing file: frontend/content/doctrine_afi41.json")
+    afi = load_afi_seed()
+    if not afi:
+        st.error("Missing or empty file: frontend/content/afi41_seed.csv")
         st.stop()
 
     # Search bar (clean)
@@ -363,13 +423,13 @@ with tab1:
         idx = st.session_state.open_idx
         if 0 <= idx < len(afi):
             a = afi[idx]
-            pub = safe_text(a.get("pub"))
-            title = safe_text(a.get("title"))
+            pub = sanitize_display_text(a.get("pub"))
+            title = sanitize_display_text(a.get("title"))
             st.markdown(f"### {pub} — {title}" if pub else f"### {title}")
 
             why = (a.get("why_it_matters") or "").strip()
             if why:
-                st.write(why)
+                st.write(sanitize_display_text(why))
 
             use_cases = a.get("use_cases", []) or []
             if use_cases:
@@ -380,7 +440,7 @@ with tab1:
             notes = (a.get("notes") or "").strip()
             if notes:
                 st.markdown("#### Notes")
-                st.write(notes)
+                st.write(sanitize_display_text(notes))
 
             render_links_as_buttons(a.get("official_links", []) or [])
 
@@ -402,18 +462,21 @@ with tab1:
         # LIST VIEW (banded, full-row clickable)
         for i, a in enumerate(afi):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
-            pub = safe_text(a.get("pub"))
-            title = safe_text(a.get("title"))
+            pub = sanitize_display_text(a.get("pub"))
+            title = sanitize_display_text(a.get("title"))
             display_title = f"{pub} — {title}" if pub else title
-            summary = safe_text(a.get("why_it_matters"))
+            summary = sanitize_display_text(a.get("why_it_matters"))
             tags_html = render_tags(a.get("tags", []) or [])
 
             token = make_open_token("afi", i)
-            href = "?open=" + quote(token)
+            official_links = a.get("official_links", []) or []
+            external_url = official_links[0].get("url") if official_links else ""
+            href = external_url or ("?open=" + quote(token))
+            target = ' target="_blank" rel="noopener"' if external_url else ""
 
             st.markdown(
                 f"""
-                <a class="sf-rowlink" href="{href}">
+                <a class="sf-rowlink" href="{href}"{target}>
                   <div class="sf-row" style="background:{bg};">
                     <div>{f"<div class='sf-badge'>{pub}</div>" if pub else ""}</div>
                     <div style="flex:1;">
@@ -467,16 +530,16 @@ with tab2:
         idx = st.session_state.open_idx
         if 0 <= idx < len(toolkit):
             t = toolkit[idx]
-            title = safe_text(t.get("title"))
+            title = sanitize_display_text(t.get("title"))
             st.markdown(f"### {title}")
 
             doc_type = (t.get("type") or "").strip()
             if doc_type:
-                st.caption(f"Type: {doc_type}")
+                st.caption(f"Type: {sanitize_display_text(doc_type)}")
 
             summary = (t.get("summary") or "").strip()
             if summary:
-                st.write(summary)
+                st.write(sanitize_display_text(summary))
 
             render_links_as_buttons(t.get("official_links", []) or [])
 
@@ -497,17 +560,20 @@ with tab2:
         # LIST VIEW
         for i, t in enumerate(toolkit):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
-            title = safe_text(t.get("title"))
-            summary = safe_text(t.get("summary"))
+            title = sanitize_display_text(t.get("title"))
+            summary = sanitize_display_text(t.get("summary"))
             tags_html = render_tags(t.get("tags", []) or [])
-            doc_type = safe_text(t.get("type"))
+            doc_type = sanitize_display_text(t.get("type"))
 
             token = make_open_token("toolkit", i)
-            href = "?open=" + quote(token)
+            official_links = t.get("official_links", []) or []
+            external_url = official_links[0].get("url") if official_links else ""
+            href = external_url or ("?open=" + quote(token))
+            target = ' target="_blank" rel="noopener"' if external_url else ""
 
             st.markdown(
                 f"""
-                <a class="sf-rowlink" href="{href}">
+                <a class="sf-rowlink" href="{href}"{target}>
                   <div class="sf-row" style="background:{bg};">
                     <div>{f"<div class='sf-badge'>{doc_type}</div>" if doc_type else ""}</div>
                     <div style="flex:1;">
@@ -535,17 +601,18 @@ with tab3:
     if health.get("num_chunks", 0) == 0 or health.get("indexed_as_of") in ("not indexed", "unknown"):
         st.caption("Status: Index not built yet. Use “Rebuild Index (Ingest)” in the sidebar.")
 
-    question = st.text_area(
-        "Question",
-        placeholder="Example: Summarize what is available on the DHA Policies page and where to find it.",
-        height=90,
-    )
+    with st.form("ask_form"):
+        question = st.text_area(
+            "Question",
+            placeholder="Example: Summarize what is available on the DHA Policies page and where to find it.",
+            height=90,
+        )
 
-    colA, colB = st.columns([1, 1])
-    with colA:
-        run = st.button("Get Answer", type="primary", use_container_width=True)
-    with colB:
-        st.markdown("**Trust rules:** citations always shown • refusal if evidence is weak • no PHI/PII")
+        colA, colB = st.columns([1, 1])
+        with colA:
+            run = st.form_submit_button("Get Answer", type="primary", use_container_width=True)
+        with colB:
+            st.markdown("**Trust rules:** citations always shown • refusal if evidence is weak • no PHI/PII")
 
     if run and question.strip():
         with st.spinner("Retrieving evidence and generating a grounded response..."):

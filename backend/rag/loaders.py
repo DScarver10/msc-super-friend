@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import requests
+import yaml
 
 from backend.rag.chunking import chunk_text
 
@@ -135,3 +136,84 @@ def load_web_source(url: str, title: str, source: str = "web") -> Optional[Loade
     except Exception:
         return None
     return None
+
+
+def load_web_sources(sources_path: Path) -> List[Dict[str, Any]]:
+    """
+    Load web sources from a YAML file.
+    Expected structure:
+      sources:
+        - name: <group_id>
+          type: html
+          items:
+            - title: <title>
+              url: <url>
+    Returns a list of dicts with: source_id, source_type, title, text, url
+    """
+    sources_path = Path(sources_path)
+    if not sources_path.exists():
+        return []
+
+    try:
+        raw = yaml.safe_load(sources_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return []
+
+    groups = raw.get("sources") or []
+    docs: List[Dict[str, Any]] = []
+
+    for group in groups:
+        group_name = str(group.get("name") or "web").strip()
+        source_type = str(group.get("type") or "html").strip()
+        items = group.get("items") or []
+
+        for i, item in enumerate(items):
+            title = str(item.get("title") or item.get("url") or f"{group_name}-{i+1}").strip()
+            url = item.get("url")
+            if not url:
+                continue
+
+            loaded = load_web_source(url=url, title=title, source=group_name)
+            if not loaded:
+                continue
+
+            docs.append(
+                {
+                    "source_id": f"{group_name}:{i+1}",
+                    "source_type": source_type,
+                    "title": loaded.title,
+                    "text": loaded.text,
+                    "url": loaded.url,
+                }
+            )
+
+    return docs
+
+def load_sources(sources_path: Path, toolkit_docs_dir: Optional[Path]) -> List[Dict[str, Any]]:
+    """
+    Unified loader used by ingest.py.
+    Combines:
+      1) local toolkit docs (PDF/XLSX/etc in toolkit_docs_dir)
+      2) web sources listed in sources.yaml (sources_path)
+    Returns a list of dicts with at least: { "source": ..., "title": ..., "text": ... }
+    """
+    docs: List[Dict[str, Any]] = []
+
+    # 1) Local docs
+    if toolkit_docs_dir:
+        for doc in load_toolkit_local_docs(toolkit_docs_dir):
+            docs.append(
+                {
+                    "source_id": f"{doc.source}:{doc.title}",
+                    "source_type": "file",
+                    "title": doc.title,
+                    "text": doc.text,
+                    "url": doc.url,
+                    "local_path": str(toolkit_docs_dir / doc.url.replace("local:", "")),
+                }
+            )
+
+    # 2) Web sources from YAML
+    docs.extend(load_web_sources(sources_path))
+
+    return docs
