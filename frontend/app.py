@@ -1,8 +1,11 @@
 # frontend/app.py
 from __future__ import annotations
 
+import html
 import json
+from base64 import b64encode
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 import streamlit as st
@@ -13,12 +16,13 @@ import streamlit as st
 APP_ROOT = Path(__file__).resolve().parent
 CONTENT_DIR = APP_ROOT / "content"
 ASSETS_DIR = APP_ROOT / "assets"
+STYLES_DIR = APP_ROOT / "styles"
 
 MSC_BADGE_PATH = ASSETS_DIR / "msc.png"
+BOT_ICON_PATH = ASSETS_DIR / "bot.png"
+
 AFMS_MSC_URL = "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/"
-
 BACKEND_URL = st.secrets.get("BACKEND_URL", "http://127.0.0.1:8000")
-
 
 # ----------------------------
 # Streamlit page config
@@ -29,19 +33,24 @@ st.set_page_config(
     layout="wide",
 )
 
-# Optional UI polish (keeps it professional, not playful)
+# ----------------------------
+# Load CSS theme
+# ----------------------------
+THEME_CSS_PATH = STYLES_DIR / "theme.css"
+if THEME_CSS_PATH.exists():
+    st.markdown(f"<style>{THEME_CSS_PATH.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+
+# Small extra CSS for full-row clickable anchors (keeps it non-linky)
 st.markdown(
     """
     <style>
-      .block-container { padding-top: 1.2rem; padding-bottom: 2.2rem; }
-      h1, h2, h3 { letter-spacing: 0.2px; }
-      .stButton button { border-radius: 6px; font-weight: 600; }
-      section[data-testid="stSidebar"] h2 { letter-spacing: 0.3px; }
+      a.sf-rowlink { text-decoration: none !important; color: inherit !important; display:block; }
+      a.sf-rowlink:visited { color: inherit !important; }
+      a.sf-rowlink:active { color: inherit !important; }
     </style>
     """,
     unsafe_allow_html=True,
 )
-
 
 # ----------------------------
 # Helpers
@@ -49,6 +58,18 @@ st.markdown(
 def load_json(filename: str):
     path = CONTENT_DIR / filename
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _data_uri(path: Path) -> str:
+    if not path.exists():
+        return ""
+    ext = path.suffix.lower().replace(".", "")
+    mime = "png" if ext == "png" else "jpeg"
+    return f"data:image/{mime};base64,{b64encode(path.read_bytes()).decode()}"
+
+
+MSC_BADGE_URI = _data_uri(MSC_BADGE_PATH)
+BOT_ICON_URI = _data_uri(BOT_ICON_PATH)
 
 
 def get_health():
@@ -72,54 +93,199 @@ def ask(question: str, top_k: int, allowed_sources: list[str] | None):
     return r.json()
 
 
-def render_links(links: list[dict]):
+def qp_get() -> dict:
+    # Streamlit has two APIs depending on version
+    try:
+        return dict(st.query_params)  # type: ignore[attr-defined]
+    except Exception:
+        return st.experimental_get_query_params()
+
+
+def qp_set(**kwargs):
+    # Remove keys with None/"" to keep URL clean
+    clean = {k: v for k, v in kwargs.items() if v not in (None, "", [])}
+    try:
+        st.query_params.clear()  # type: ignore[attr-defined]
+        for k, v in clean.items():
+            st.query_params[k] = v  # type: ignore[attr-defined]
+    except Exception:
+        st.experimental_set_query_params(**clean)
+
+
+def render_app_header():
+    logo_img = f"<img src='{MSC_BADGE_URI}' alt='MSC'/>" if MSC_BADGE_URI else ""
+    st.markdown(
+        f"""
+        <div class="sf-header">
+          <div class="sf-head-top">
+            <div class="sf-brand">
+              <div class="sf-mark">{logo_img}</div>
+              <div class="sf-titles">
+                <h1>MSC Super Friend</h1>
+                <div class="sub">Curated Reference Library</div>
+              </div>
+            </div>
+            <div class="sf-actions">
+              <div class="sf-iconbtn">🔍</div>
+              <div class="sf-iconbtn">☰</div>
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption("Public sources only. Do not enter PHI/PII.")
+
+
+def render_welcome_panel():
+    icon = f"<img src='{BOT_ICON_URI}' alt='Bot'/>" if BOT_ICON_URI else "🤖"
+    st.markdown(
+        f"""
+        <div class="sf-welcome">
+          <div class="sf-avatar">{icon}</div>
+          <div>
+            <h3>Hi! I’m MSC Super Friend.</h3>
+            <p>Ask me to find guidance, summarize references, or point you to the right AFI or DHA publication.</p>
+            <div class="muted">Public sources only. Do not enter PHI/PII.</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_links_as_buttons(links: list[dict]):
+    # Cleaner than raw markdown link list, still “trust-first”
     if not links:
-        st.markdown("**Links:** _None_")
+        st.caption("Official links: none")
         return
-    st.markdown("**Links:**")
+
+    st.markdown("#### Official links")
     for link in links:
-        label = link.get("label", "Link")
+        label = link.get("label", "Open")
         url = link.get("url", "")
-        st.markdown(f"- [{label}]({url})")
+        if url:
+            st.link_button(label, url, use_container_width=True)
 
 
-def render_card_header(title: str, tags: list[str] | None, last_reviewed: str | None):
-    st.markdown(f"### {title}")
-    cols = st.columns([3, 1])
-    with cols[0]:
-        if tags:
-            st.markdown(" • ".join([f"`{t}`" for t in tags]))
-    with cols[1]:
-        if last_reviewed:
-            st.caption(f"Last reviewed: {last_reviewed}")
+def render_tags(tags: list[str] | None):
+    tags = tags or []
+    if not tags:
+        return ""
+    safe = [f"<span class='sf-tag'>{html.escape(t)}</span>" for t in tags[:6]]
+    return f"<div class='sf-tags'>{''.join(safe)}</div>"
+
+
+def safe_text(x: str | None) -> str:
+    return html.escape((x or "").strip())
+
+
+def make_open_token(kind: str, idx: int) -> str:
+    # stable enough within this run; we’ll re-map each rerun from JSON
+    return f"{kind}:{idx}"
+
+def render_feedback_controls(question: str, answer: str, citations: list[dict] | None):
+    """
+    Renders 👍 / 👎 feedback controls under an answer.
+    Stores feedback via POST /feedback.
+    """
+    citations = citations or []
+
+    # Stable per-question/answer key
+    q_id = _hash_text(question.strip())
+    a_id = _hash_text(answer.strip())
+    key_prefix = f"fb_{q_id}_{a_id}"
+
+    if key_prefix not in st.session_state:
+        st.session_state[key_prefix] = {"vote": None}
+
+    vote = st.session_state[key_prefix]["vote"]
+
+    # Wrapper for CSS pill styling
+    st.markdown('<div class="sf-feedback">', unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns([1, 1, 6], vertical_alignment="center")
+
+    with c1:
+        st.markdown('<div class="is-selected">' if vote == "up" else "<div>", unsafe_allow_html=True)
+        up = st.button("👍", key=f"{key_prefix}_up")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c2:
+        st.markdown('<div class="is-selected">' if vote == "down" else "<div>", unsafe_allow_html=True)
+        down = st.button("👎", key=f"{key_prefix}_down")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c3:
+        if vote == "up":
+            st.caption("Recorded: Helpful")
+        elif vote == "down":
+            st.caption("Recorded: Not helpful")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Handle clicks
+    if up:
+        payload = {
+            "vote": "up",
+            "question_id": q_id,
+            "answer_id": a_id,
+            "question": question,
+            "answer": answer,
+            "citations": citations,
+        }
+        submit_feedback(payload)
+        st.session_state[key_prefix]["vote"] = "up"
+        st.toast("Thanks — feedback recorded", icon="✅")
+
+    if down:
+        payload = {
+            "vote": "down",
+            "question_id": q_id,
+            "answer_id": a_id,
+            "question": question,
+            "answer": answer,
+            "citations": citations,
+        }
+        submit_feedback(payload)
+        st.session_state[key_prefix]["vote"] = "down"
+        st.toast("Thanks — feedback recorded", icon="✅")
 
 
 # ----------------------------
-# Header (trust-first)
+# Init session state
 # ----------------------------
-col_logo, col_title = st.columns([1, 6], vertical_alignment="center")
-with col_logo:
-    if MSC_BADGE_PATH.exists():
-        st.image(str(MSC_BADGE_PATH), width=80)
-with col_title:
-    st.title("MSC Super Friend")
-    st.caption("Curated MSC references + evidence-grounded retrieval. Public sources only. Do not enter PHI/PII.")
+if "open_token" not in st.session_state:
+    st.session_state.open_token = ""
+if "open_kind" not in st.session_state:
+    st.session_state.open_kind = ""
+if "open_idx" not in st.session_state:
+    st.session_state.open_idx = None
 
-# Status strip (backend reachable?)
+# ----------------------------
+# Header
+# ----------------------------
+render_app_header()
+
+# ----------------------------
+# Backend status (calm)
+# ----------------------------
 try:
     health = get_health()
     sources_list = health.get("sources", [])
-    st.success(
-        f"Backend OK • Indexed: {health.get('indexed_as_of')} • "
+    st.caption(
+        f"Backend: OK • Indexed: {health.get('indexed_as_of')} • "
         f"Chunks: {health.get('num_chunks')} • "
         f"Sources: {', '.join(sources_list) if sources_list else 'None'}"
     )
-except Exception as e:
-    st.warning(f"Backend not reachable (RAG disabled): {e}")
+except Exception:
     health = {"sources": [], "indexed_as_of": "unknown", "num_chunks": 0}
     sources_list = []
+    st.caption("Backend: Offline • Ask Super Friend may be in offline mode. You can still browse doctrine.")
 
-# Sidebar controls (RAG only)
+# ----------------------------
+# Sidebar (RAG controls)
+# ----------------------------
 st.sidebar.header("RAG Controls")
 top_k = st.sidebar.slider("Evidence to retrieve (Top-K)", min_value=1, max_value=12, value=5)
 allowed = st.sidebar.multiselect("Limit sources (optional)", options=sources_list, default=[])
@@ -138,9 +304,28 @@ if st.sidebar.button("Rebuild Index (Ingest)", use_container_width=True):
 st.sidebar.divider()
 st.sidebar.caption("Tip: Prefer direct official PDFs for maximum trust and speed.")
 
-# Tabs (no emoji / no kiddy icons)
-tab1, tab2, tab3 = st.tabs(["Doctrine Library", "MSC Toolkit", "RAG Q&A"])
+# ----------------------------
+# Tabs
+# ----------------------------
+tab1, tab2, tab3 = st.tabs(["Doctrine Library", "MSC Toolkit", "Ask Super Friend"])
 
+# ----------------------------
+# Query param routing (full-row clickable)
+# ----------------------------
+params = qp_get()
+open_param = params.get("open")
+# normalize (can be list in older API)
+if isinstance(open_param, list):
+    open_param = open_param[0] if open_param else ""
+
+if open_param:
+    # expected "afi:12" or "toolkit:3"
+    token = str(open_param)
+    parts = token.split(":")
+    if len(parts) == 2 and parts[1].isdigit():
+        st.session_state.open_token = token
+        st.session_state.open_kind = parts[0]
+        st.session_state.open_idx = int(parts[1])
 
 # ----------------------------
 # Tab 1: Doctrine Library
@@ -155,40 +340,93 @@ with tab1:
         st.error("Missing file: frontend/content/doctrine_afi41.json")
         st.stop()
 
-    q = st.text_input("Search AFI 41-series", placeholder="Search by AFI number, title, tags, or use case...")
+    # Search bar (clean)
+    q = st.text_input(
+        "",
+        placeholder="Search AFI number, title, tags, or use case…",
+        label_visibility="collapsed",
+    )
+
     if q:
         ql = q.lower()
         afi = [
             a for a in afi
-            if ql in a.get("pub", "").lower()
-            or ql in a.get("title", "").lower()
-            or ql in a.get("why_it_matters", "").lower()
-            or any(ql in t.lower() for t in a.get("tags", []))
-            or any(ql in uc.lower() for uc in a.get("use_cases", []))
+            if ql in (a.get("pub", "") or "").lower()
+            or ql in (a.get("title", "") or "").lower()
+            or ql in (a.get("why_it_matters", "") or "").lower()
+            or any(ql in t.lower() for t in (a.get("tags", []) or []))
+            or any(ql in uc.lower() for uc in (a.get("use_cases", []) or []))
         ]
 
-    for a in afi:
-        pub = a.get("pub", "").strip()
-        title = a.get("title", "").strip()
-        display_title = f"{pub} — {title}" if pub else title
+    # If open token points to afi detail, render detail
+    if st.session_state.open_kind == "afi" and st.session_state.open_idx is not None:
+        idx = st.session_state.open_idx
+        if 0 <= idx < len(afi):
+            a = afi[idx]
+            pub = safe_text(a.get("pub"))
+            title = safe_text(a.get("title"))
+            st.markdown(f"### {pub} — {title}" if pub else f"### {title}")
 
-        with st.container(border=True):
-            render_card_header(display_title, a.get("tags", []), a.get("last_reviewed"))
-            st.write(a.get("why_it_matters", ""))
+            why = (a.get("why_it_matters") or "").strip()
+            if why:
+                st.write(why)
 
-            use_cases = a.get("use_cases", [])
+            use_cases = a.get("use_cases", []) or []
             if use_cases:
-                st.markdown("**Use cases:**")
-                for uc in use_cases:
+                st.markdown("#### Use cases")
+                for uc in use_cases[:8]:
                     st.markdown(f"- {uc}")
-
-            render_links(a.get("official_links", []))
 
             notes = (a.get("notes") or "").strip()
             if notes:
-                st.markdown("**Notes:**")
+                st.markdown("#### Notes")
                 st.write(notes)
 
+            render_links_as_buttons(a.get("official_links", []) or [])
+
+            if st.button("← Back to list", use_container_width=True):
+                st.session_state.open_token = ""
+                st.session_state.open_kind = ""
+                st.session_state.open_idx = None
+                qp_set()  # clear query params
+                st.rerun()
+        else:
+            # bad index, clear
+            st.session_state.open_token = ""
+            st.session_state.open_kind = ""
+            st.session_state.open_idx = None
+            qp_set()
+            st.rerun()
+
+    else:
+        # LIST VIEW (banded, full-row clickable)
+        for i, a in enumerate(afi):
+            bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
+            pub = safe_text(a.get("pub"))
+            title = safe_text(a.get("title"))
+            display_title = f"{pub} — {title}" if pub else title
+            summary = safe_text(a.get("why_it_matters"))
+            tags_html = render_tags(a.get("tags", []) or [])
+
+            token = make_open_token("afi", i)
+            href = "?open=" + quote(token)
+
+            st.markdown(
+                f"""
+                <a class="sf-rowlink" href="{href}">
+                  <div class="sf-row" style="background:{bg};">
+                    <div>{f"<div class='sf-badge'>{pub}</div>" if pub else ""}</div>
+                    <div style="flex:1;">
+                      <div class="sf-title">{display_title}</div>
+                      {f"<div class='sf-summary'>{summary}</div>" if summary else ""}
+                      {tags_html}
+                    </div>
+                    <div class="sf-chev">›</div>
+                  </div>
+                </a>
+                """,
+                unsafe_allow_html=True,
+            )
 
 # ----------------------------
 # Tab 2: MSC Toolkit
@@ -197,48 +435,105 @@ with tab2:
     st.subheader("MSC Toolkit")
     st.caption("Helpful documents at your fingertips.")
 
-    # 1) Direct link to AFMS MSC landing page (prominent)
+    # Official MSC landing page
     st.markdown("### Official MSC Landing Page")
-    st.markdown(f"**[Open AFMS Medical Service Corps Page]({AFMS_MSC_URL})**")
+    st.link_button("Open AFMS Medical Service Corps Page", AFMS_MSC_URL, use_container_width=True)
 
     st.divider()
 
-    # 2) Helpful documents from toolkit.json
     try:
         toolkit = load_json("toolkit.json")
     except FileNotFoundError:
         st.error("Missing file: frontend/content/toolkit.json")
         st.stop()
 
-    q = st.text_input("Search toolkit documents", placeholder="Search by title, tags, or summary...")
-    if q:
-        ql = q.lower()
+    q2 = st.text_input(
+        "",
+        placeholder="Search toolkit documents by title, tags, or summary…",
+        label_visibility="collapsed",
+        key="toolkit_search",
+    )
+    if q2:
+        ql = q2.lower()
         toolkit = [
             t for t in toolkit
-            if ql in t.get("title", "").lower()
-            or ql in t.get("summary", "").lower()
-            or any(ql in tag.lower() for tag in t.get("tags", []))
+            if ql in (t.get("title", "") or "").lower()
+            or ql in (t.get("summary", "") or "").lower()
+            or any(ql in tag.lower() for tag in (t.get("tags", []) or []))
         ]
 
-    for t in toolkit:
-        with st.container(border=True):
-            render_card_header(t.get("title", ""), t.get("tags", []), t.get("last_reviewed"))
+    # Detail view
+    if st.session_state.open_kind == "toolkit" and st.session_state.open_idx is not None:
+        idx = st.session_state.open_idx
+        if 0 <= idx < len(toolkit):
+            t = toolkit[idx]
+            title = safe_text(t.get("title"))
+            st.markdown(f"### {title}")
+
             doc_type = (t.get("type") or "").strip()
             if doc_type:
-                st.markdown(f"`{doc_type}`")
-            st.write(t.get("summary", ""))
-            render_links(t.get("official_links", []))
+                st.caption(f"Type: {doc_type}")
 
+            summary = (t.get("summary") or "").strip()
+            if summary:
+                st.write(summary)
+
+            render_links_as_buttons(t.get("official_links", []) or [])
+
+            if st.button("← Back to toolkit", use_container_width=True):
+                st.session_state.open_token = ""
+                st.session_state.open_kind = ""
+                st.session_state.open_idx = None
+                qp_set()
+                st.rerun()
+        else:
+            st.session_state.open_token = ""
+            st.session_state.open_kind = ""
+            st.session_state.open_idx = None
+            qp_set()
+            st.rerun()
+
+    else:
+        # LIST VIEW
+        for i, t in enumerate(toolkit):
+            bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
+            title = safe_text(t.get("title"))
+            summary = safe_text(t.get("summary"))
+            tags_html = render_tags(t.get("tags", []) or [])
+            doc_type = safe_text(t.get("type"))
+
+            token = make_open_token("toolkit", i)
+            href = "?open=" + quote(token)
+
+            st.markdown(
+                f"""
+                <a class="sf-rowlink" href="{href}">
+                  <div class="sf-row" style="background:{bg};">
+                    <div>{f"<div class='sf-badge'>{doc_type}</div>" if doc_type else ""}</div>
+                    <div style="flex:1;">
+                      <div class="sf-title">{title}</div>
+                      {f"<div class='sf-summary'>{summary}</div>" if summary else ""}
+                      {tags_html}
+                    </div>
+                    <div class="sf-chev">›</div>
+                  </div>
+                </a>
+                """,
+                unsafe_allow_html=True,
+            )
 
 # ----------------------------
-# Tab 3: RAG Q&A
+# Tab 3: Ask Super Friend
 # ----------------------------
 with tab3:
     st.subheader("Ask Super Friend")
     st.caption("Answers are generated only from indexed sources. Citations are always shown.")
 
+    # Welcome panel (visual polish + guidance)
+    render_welcome_panel()
+
     if health.get("num_chunks", 0) == 0 or health.get("indexed_as_of") in ("not indexed", "unknown"):
-        st.warning("Index not built yet. Run 'Rebuild Index (Ingest)' in the sidebar.")
+        st.caption("Status: Index not built yet. Use “Rebuild Index (Ingest)” in the sidebar.")
 
     question = st.text_area(
         "Question",
@@ -273,7 +568,7 @@ with tab3:
                     st.markdown("### Evidence & Citations")
                     citations = resp.get("citations", [])
                     if not citations:
-                        st.info("No citations returned.")
+                        st.caption("No citations returned.")
                     else:
                         for i, c in enumerate(citations, start=1):
                             title = c.get("title", "Untitled")
@@ -283,14 +578,17 @@ with tab3:
                             st.markdown(
                                 f"**[{i}] {title}**  \n"
                                 f"Source: `{source}`  \n"
-                                f"Score: `{score:.3f}`  \n"
-                                f"[Open]({url})"
+                                f"Score: `{score:.3f}`"
                             )
+                            if url:
+                                st.link_button("Open source", url, use_container_width=True)
 
             except requests.HTTPError as e:
+                # Keep errors calm (no giant raw JSON)
+                st.caption("Request failed. Backend may be offline.")
                 try:
-                    st.error(e.response.json())
+                    st.code(e.response.text)
                 except Exception:
-                    st.error(f"Request failed: {e}")
-            except Exception as e:
-                st.error(f"Unexpected error: {e}")
+                    st.code(str(e))
+            except Exception:
+                st.caption("Unexpected error. Backend may be offline.")

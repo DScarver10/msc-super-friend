@@ -1,17 +1,5 @@
 [
   {
-    "title": "Medical Service Corps (MSC) — AFMS Landing Page",
-    "description": "Official AFMS overview of the Medical Service Corps mission, roles, and branch information.",
-    "category": "Official Resources",
-    "web_links": [
-      {
-        "label": "Open AFMS MSC Landing Page",
-        "url": "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/"
-      }
-    ],
-    "files": []
-  },
-  {
     "title": "DHA Policies (Reference Center)",
     "description": "Authoritative directory for DHA policies and memoranda. Use for policy lookup and governance alignment.",
     "category": "Policy",
