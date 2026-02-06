@@ -50,6 +50,40 @@ st.markdown(
       a.sf-rowlink { text-decoration: none !important; color: inherit !important; display:block; }
       a.sf-rowlink:visited { color: inherit !important; }
       a.sf-rowlink:active { color: inherit !important; }
+      .stTabs [data-baseweb="tab"] { color: #1E2A32 !important; }
+      .stTabs [data-baseweb="tab"][aria-selected="true"] { color: #1E2A32 !important; }
+      .stTabs [data-baseweb="tab"]:after { background: #1B3F72 !important; }
+      .stTabs [data-baseweb="tab"][aria-selected="true"] { border-bottom: 2px solid #1B3F72 !important; }
+      .sf-title, .sf-summary { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+      .sf-title { -webkit-line-clamp: 2; }
+      .sf-summary { -webkit-line-clamp: 3; }
+      .sf-chat-wrap{
+        border: 1px solid rgba(27,63,114,0.28);
+        background: #FFFFFF;
+        border-radius: var(--cardRadius);
+        box-shadow: var(--cardShadow);
+        padding: 12px 12px 10px 12px;
+        margin: 8px 0 12px 0;
+      }
+      .sf-chat-label{
+        font-size: 12px;
+        color: var(--muted);
+        margin: 8px 0 6px 0;
+      }
+      .sf-chat-wrap .sf-welcome{
+        margin: 0;
+        box-shadow: none;
+        border: none;
+        background: transparent;
+      }
+      .sf-chat-wrap .stTextArea > div > div{
+        border-color: #1B3F72;
+        background: #FFFFFF;
+        color: #1E2A32;
+      }
+      .sf-chat-wrap [data-testid="stButton"]{
+        margin-top: 6px;
+      }
     </style>
     """,
     unsafe_allow_html=True,
@@ -196,7 +230,20 @@ def render_links_as_buttons(links: list[dict]):
         label = link.get("label", "Open")
         url = link.get("url", "")
         if url:
-            st.link_button(label, url, use_container_width=True)
+            if is_url(url):
+                st.link_button(label, url, use_container_width=True)
+            else:
+                local_path = resolve_local_path(url)
+                if local_path and local_path.exists():
+                    data = load_file_bytes(local_path)
+                    mime = mime_for_path(local_path)
+                    st.download_button(
+                        label,
+                        data=data,
+                        file_name=local_path.name,
+                        mime=mime,
+                        use_container_width=True,
+                    )
 
 
 def render_tags(tags: list[str] | None):
@@ -215,6 +262,32 @@ def sanitize_display_text(x: str | None) -> str:
     raw = html.unescape((x or "").strip())
     no_tags = re.sub(r"<[^>]+>", "", raw)
     return no_tags.strip()
+
+
+def is_url(value: str | None) -> bool:
+    if not value:
+        return False
+    return value.startswith("http://") or value.startswith("https://")
+
+
+def resolve_local_path(value: str) -> Path | None:
+    if is_url(value):
+        return None
+    # Treat relative paths as frontend-local
+    return (APP_ROOT / value).resolve()
+
+
+def load_file_bytes(path: Path) -> bytes:
+    return path.read_bytes()
+
+
+def mime_for_path(path: Path) -> str:
+    ext = path.suffix.lower()
+    if ext == ".pdf":
+        return "application/pdf"
+    if ext == ".xlsx":
+        return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return "application/octet-stream"
 
 
 def to_sentence_case(text: str) -> str:
@@ -476,6 +549,7 @@ with tab1:
         # LIST VIEW (banded, full-row clickable)
         for i, a in enumerate(afi):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
+            border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
             pub = sanitize_display_text(a.get("pub"))
             title = to_sentence_case(a.get("title") or "")
             display_title = f"{pub} — {title}" if pub else title
@@ -491,7 +565,7 @@ with tab1:
             st.markdown(
                 f"""
                 <a class="sf-rowlink" href="{href}"{target}>
-                  <div class="sf-row" style="background:{bg};">
+                  <div class="sf-row" style="background:{bg}; border-color:{border_color};">
                     <div>{f"<div class='sf-badge'>{pub}</div>" if pub else ""}</div>
                     <div style="flex:1;">
                       <div class="sf-title">{display_title}</div>
@@ -583,33 +657,52 @@ with tab2:
         # LIST VIEW
         for i, t in enumerate(toolkit):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
+            border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
             title = to_sentence_case(t.get("title") or "")
             summary = sanitize_display_text(t.get("summary"))
-            tags_html = render_tags(t.get("tags", []) or [])
+            tags_html = ""
             doc_type = to_sentence_case(t.get("type") or "")
 
-            token = make_open_token("toolkit", i)
             official_links = t.get("official_links", []) or []
-            external_url = official_links[0].get("url") if official_links else ""
-            href = external_url or ("?open=" + quote(token))
+            primary_link = official_links[0].get("url") if official_links else ""
+            external_url = primary_link if is_url(primary_link) else ""
+            local_path = resolve_local_path(primary_link) if primary_link and not external_url else None
+            has_local_file = bool(local_path and local_path.exists())
             target = ' target="_blank" rel="noopener"' if external_url else ""
 
-            st.markdown(
-                f"""
-                <a class="sf-rowlink" href="{href}"{target}>
-                  <div class="sf-row" style="background:{bg};">
-                    <div>{f"<div class='sf-badge'>{doc_type}</div>" if doc_type else ""}</div>
-                    <div style="flex:1;">
-                      <div class="sf-title">{title}</div>
-                      {f"<div class='sf-summary'>{summary}</div>" if summary else ""}
-                      {tags_html}
-                    </div>
-                    <div class="sf-chev">›</div>
+            card_html = f"""
+                <div class="sf-row" style="background:{bg}; border-color:{border_color};">
+                  <div>{f"<div class='sf-badge'>{doc_type}</div>" if doc_type else ""}</div>
+                  <div style="flex:1;">
+                    <div class="sf-title">{title}</div>
+                    {f"<div class='sf-summary'>{summary}</div>" if summary else ""}
+                    {tags_html}
                   </div>
-                </a>
-                """,
-                unsafe_allow_html=True,
-            )
+                  <div class="sf-chev">›</div>
+                </div>
+            """
+
+            if external_url:
+                st.markdown(
+                    f"""
+                    <a class="sf-rowlink" href="{external_url}"{target}>
+                      {card_html}
+                    </a>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(card_html, unsafe_allow_html=True)
+                if has_local_file:
+                    data = load_file_bytes(local_path)
+                    st.download_button(
+                        "Open file",
+                        data=data,
+                        file_name=local_path.name,
+                        mime=mime_for_path(local_path),
+                        use_container_width=True,
+                        key=f"toolkit_open_{i}",
+                    )
 
 # ----------------------------
 # Tab 3: Ask Super Friend
@@ -619,15 +712,16 @@ with tab3:
     st.caption("Citations are always shown.")
 
     # Welcome panel (visual polish + guidance)
+    st.markdown('<div class="sf-chat-wrap">', unsafe_allow_html=True)
     render_welcome_panel()
-
-    # Status line intentionally hidden from UI.
+    st.markdown('<div class="sf-chat-label">Ask a question</div>', unsafe_allow_html=True)
 
     with st.form("ask_form"):
         question = st.text_area(
             "Question",
-            placeholder="Example: Summarize what is available on the DHA Policies page and where to find it.",
+            placeholder="Ask MSC Super Friend a question…",
             height=90,
+            label_visibility="collapsed",
         )
 
         colA, colB = st.columns([1, 1])
@@ -635,6 +729,7 @@ with tab3:
             run = st.form_submit_button("Get Answer", type="primary", use_container_width=True)
         with colB:
             pass
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if run and question.strip():
         with st.spinner("Retrieving evidence and generating a grounded response..."):
