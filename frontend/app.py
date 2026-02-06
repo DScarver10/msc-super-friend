@@ -62,6 +62,26 @@ st.markdown(
       .sf-card-title{ display:-webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
       .sf-card-desc{ display:-webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
       .sf-card-chevron{ color: rgba(30,42,50,0.65); font-size: 22px; line-height: 1; padding-top: 2px; margin-left:auto; }
+      .sf-card-wrap{ margin: 6px 0; }
+      .sf-card-wrap [data-testid="stDownloadButton"] > button,
+      .sf-card-wrap [data-testid="stLinkButton"] > a{
+        display: block;
+        width: 100%;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: var(--cardRadius);
+        padding: 14px;
+        text-align: left;
+        white-space: normal;
+        box-shadow: var(--cardShadow);
+        color: #1E2A32 !important;
+        text-decoration: none !important;
+      }
+      .sf-card-wrap [data-testid="stDownloadButton"] > button:hover,
+      .sf-card-wrap [data-testid="stLinkButton"] > a:hover{
+        background: rgba(27,63,114,.06);
+        border-color: rgba(27,63,114,.35);
+      }
       .sf-header{
         border: 2px solid #0B3C5D !important;
         border-radius: 14px !important;
@@ -305,36 +325,32 @@ def escape_html(x: str | None) -> str:
     return html.escape((x or "").strip(), quote=True)
 
 
-def render_clickable_card(
-    href: str,
-    title: str,
-    summary: str,
-    pill_text: str,
+def render_card_button(
+    label: str,
     bg: str,
     border_color: str,
+    key: str,
+    url: str | None = None,
+    data: bytes | None = None,
+    file_name: str | None = None,
+    mime: str | None = None,
 ) -> None:
-    safe_title = escape_html(strip_html(title))
-    safe_summary = escape_html(strip_html(summary))
-    safe_pill = escape_html(strip_html(pill_text))
-    card_inner = f"""
-        <div class="sf-row" style="background:{bg}; border-color:{border_color};">
-          <div>{f"<div class='sf-badge sf-card-pill'>{safe_pill}</div>" if safe_pill else ""}</div>
-          <div style="flex:1;">
-            <div class="sf-card-title">{safe_title}</div>
-            {f"<div class='sf-card-desc'>{safe_summary}</div>" if safe_summary else ""}
-          </div>
-          <div class="sf-card-chevron">›</div>
-        </div>
-    """
-    if href:
-        card_html = f"""
-            <a class="sf-card-link" href="{href}" target="_blank" rel="noopener noreferrer">
-              {card_inner}
-            </a>
-        """
-    else:
-        card_html = card_inner
-    st.markdown(card_html, unsafe_allow_html=True)
+    st.markdown(
+        f"<div class='sf-card-wrap' style='--card-bg:{bg}; --card-border:{border_color};'>",
+        unsafe_allow_html=True,
+    )
+    if data is not None and file_name and mime:
+        st.download_button(
+            label,
+            data=data,
+            file_name=file_name,
+            mime=mime,
+            use_container_width=True,
+            key=key,
+        )
+    elif url:
+        st.link_button(label, url, use_container_width=True, key=key)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def is_url(value: str | None) -> bool:
@@ -348,6 +364,18 @@ def resolve_local_path(value: str) -> Path | None:
         return None
     # Treat relative paths as frontend-local
     return (APP_ROOT / value).resolve()
+
+def is_local_doc(value: str | None) -> bool:
+    if not value:
+        return False
+    v = value.strip()
+    lower = v.lower()
+    if "frontend/docs" in lower or "/docs/" in lower or "\\docs\\" in lower:
+        return True
+    if lower.endswith(".pdf"):
+        candidate = (APP_ROOT / "docs" / Path(v).name)
+        return candidate.exists()
+    return False
 
 
 def build_doc_url(item: dict) -> str:
@@ -655,16 +683,37 @@ with tab1:
             display_title = f"{pub} — {title}" if pub else title
             summary = strip_html(a.get("why_it_matters"))
             tag_label = strip_html((a.get("tags", []) or [""])[0]) if a.get("tags") else ""
-            doc_url = build_doc_url(a)
+            official_links = a.get("official_links", []) or []
+            raw_link = official_links[0].get("url") if official_links else ""
+            external_url = raw_link if is_url(raw_link) else ""
+            local_path = (APP_ROOT / "docs" / Path(raw_link).name) if is_local_doc(raw_link) else None
+            has_local_file = bool(local_path and local_path.exists())
 
-            with st.container():
-                st.markdown(f"**{display_title}**")
-                if summary:
-                    st.write(summary)
-                if tag_label:
-                    st.caption(f"Tag: {tag_label}")
-                if doc_url and (BACKEND_OK or is_url(doc_url)):
-                    st.link_button("Open", doc_url, use_container_width=True)
+            parts = [display_title]
+            if summary:
+                parts.append(summary)
+            if tag_label:
+                parts.append(f"Tag: {tag_label}")
+            label = "\n".join(parts)
+
+            if external_url:
+                render_card_button(
+                    label=label,
+                    bg=bg,
+                    border_color=border_color,
+                    key=f"doc_card_{i}",
+                    url=external_url,
+                )
+            elif has_local_file:
+                render_card_button(
+                    label=label,
+                    bg=bg,
+                    border_color=border_color,
+                    key=f"doc_card_{i}",
+                    data=load_file_bytes(local_path),
+                    file_name=local_path.name,
+                    mime=mime_for_path(local_path),
+                )
 
 # ----------------------------
 # Tab 2: MSC Toolkit
@@ -752,26 +801,32 @@ with tab2:
             official_links = t.get("official_links", []) or []
             primary_link = official_links[0].get("url") if official_links else ""
             external_url = primary_link if is_url(primary_link) else ""
-            local_path = resolve_local_path(primary_link) if primary_link and not external_url else None
+            local_path = (APP_ROOT / "docs" / Path(primary_link).name) if is_local_doc(primary_link) else None
             has_local_file = bool(local_path and local_path.exists())
-            with st.container():
-                st.markdown(f"**{title}**")
-                if summary:
-                    st.write(summary)
-                if doc_type:
-                    st.caption(f"Tag: {doc_type}")
-                if external_url:
-                    st.link_button("Open", external_url, use_container_width=True)
-                elif has_local_file:
-                    data = load_file_bytes(local_path)
-                    st.download_button(
-                        "Download",
-                        data=data,
-                        file_name=local_path.name,
-                        mime=mime_for_path(local_path),
-                        use_container_width=True,
-                        key=f"toolkit_download_{i}",
-                    )
+            parts = [title]
+            if summary:
+                parts.append(summary)
+            if doc_type:
+                parts.append(f"Tag: {doc_type}")
+            label = "\n".join(parts)
+            if external_url:
+                render_card_button(
+                    label=label,
+                    bg=bg,
+                    border_color=border_color,
+                    key=f"tool_card_{i}",
+                    url=external_url,
+                )
+            elif has_local_file:
+                render_card_button(
+                    label=label,
+                    bg=bg,
+                    border_color=border_color,
+                    key=f"tool_card_{i}",
+                    data=load_file_bytes(local_path),
+                    file_name=local_path.name,
+                    mime=mime_for_path(local_path),
+                )
 
 # ----------------------------
 # Tab 3: Ask Super Friend
