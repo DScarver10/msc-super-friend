@@ -646,7 +646,7 @@ with tab1:
             st.rerun()
 
     else:
-        # LIST VIEW (banded, full-row clickable)
+        # LIST VIEW (plain text cards)
         for i, a in enumerate(afi):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
             border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
@@ -654,27 +654,17 @@ with tab1:
             title = to_sentence_case(a.get("title") or "")
             display_title = f"{pub} — {title}" if pub else title
             summary = strip_html(a.get("why_it_matters"))
-            tags_html = ""
-
+            tag_label = strip_html((a.get("tags", []) or [""])[0]) if a.get("tags") else ""
             doc_url = build_doc_url(a)
-            if doc_url and (BACKEND_OK or is_url(doc_url)):
-                render_clickable_card(
-                    href=doc_url,
-                    title=display_title,
-                    summary=summary,
-                    pill_text=pub,
-                    bg=bg,
-                    border_color=border_color,
-                )
-            elif doc_url:
-                render_clickable_card(
-                    href="",
-                    title=display_title,
-                    summary=summary,
-                    pill_text=pub,
-                    bg=bg,
-                    border_color=border_color,
-                )
+
+            with st.container():
+                st.markdown(f"**{display_title}**")
+                if summary:
+                    st.write(summary)
+                if tag_label:
+                    st.caption(f"Tag: {tag_label}")
+                if doc_url and (BACKEND_OK or is_url(doc_url)):
+                    st.link_button("Open", doc_url, use_container_width=True)
 
 # ----------------------------
 # Tab 2: MSC Toolkit
@@ -764,38 +754,18 @@ with tab2:
             external_url = primary_link if is_url(primary_link) else ""
             local_path = resolve_local_path(primary_link) if primary_link and not external_url else None
             has_local_file = bool(local_path and local_path.exists())
-            if external_url:
-                render_clickable_card(
-                    href=external_url,
-                    title=title,
-                    summary=summary,
-                    pill_text=doc_type,
-                    bg=bg,
-                    border_color=border_color,
-                )
-            elif has_local_file:
-                if BACKEND_OK and BACKEND_URL_CONFIGURED:
-                    file_href = f"{BACKEND_URL}/docs/{quote(local_path.name)}"
-                    render_clickable_card(
-                        href=file_href,
-                        title=title,
-                        summary=summary,
-                        pill_text=doc_type,
-                        bg=bg,
-                        border_color=border_color,
-                    )
-                else:
-                    render_clickable_card(
-                        href="",
-                        title=title,
-                        summary=summary,
-                        pill_text=doc_type,
-                        bg=bg,
-                        border_color=border_color,
-                    )
+            with st.container():
+                st.markdown(f"**{title}**")
+                if summary:
+                    st.write(summary)
+                if doc_type:
+                    st.caption(f"Tag: {doc_type}")
+                if external_url:
+                    st.link_button("Open", external_url, use_container_width=True)
+                elif has_local_file:
                     data = load_file_bytes(local_path)
                     st.download_button(
-                        "Download file",
+                        "Download",
                         data=data,
                         file_name=local_path.name,
                         mime=mime_for_path(local_path),
