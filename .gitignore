@@ -22,3 +22,6 @@ backend/data/chroma*
 backend/data/index 
 frontend/streamlit/secrets.toml 
 .env 
+.env
+frontend/.streamlit/secrets.toml
+backend/data/index/

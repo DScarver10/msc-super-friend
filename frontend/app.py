@@ -57,13 +57,25 @@ st.markdown(
       .sf-title, .sf-summary { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
       .sf-title { -webkit-line-clamp: 2; }
       .sf-summary { -webkit-line-clamp: 3; }
+      .sf-header{
+        border: 2px solid #0B3C5D !important;
+        border-radius: 14px !important;
+      }
+      .stTextInput input{
+        color: #0B0F14 !important;
+        background: #FFFFFF !important;
+        border: 1px solid rgba(27,63,114,0.22) !important;
+      }
+      .stTextInput input::placeholder{
+        color: rgba(11,15,20,0.45) !important;
+      }
       .sf-chat-wrap{
         border: 1px solid rgba(27,63,114,0.28);
         background: #FFFFFF;
         border-radius: var(--cardRadius);
         box-shadow: var(--cardShadow);
-        padding: 12px 12px 10px 12px;
-        margin: 8px 0 12px 0;
+        padding: 6px 12px 10px 12px;
+        margin: 4px 0 12px 0;
       }
       .sf-chat-label{
         font-size: 12px;
@@ -79,7 +91,23 @@ st.markdown(
       .sf-chat-wrap .stTextArea > div > div{
         border-color: #1B3F72;
         background: #FFFFFF;
-        color: #1E2A32;
+        color: #111111;
+      }
+      .sf-chat-wrap textarea{
+        color: #111111 !important;
+      }
+      .sf-chat-wrap textarea::placeholder{
+        color: rgba(11,15,20,0.45) !important;
+      }
+      .sf-doclink{
+        display: inline-block;
+        margin-top: 6px;
+        color: #1B3F72;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .sf-doclink:hover{
+        text-decoration: underline;
       }
       .sf-chat-wrap [data-testid="stButton"]{
         margin-top: 6px;
@@ -231,18 +259,17 @@ def render_links_as_buttons(links: list[dict]):
         url = link.get("url", "")
         if url:
             if is_url(url):
-                st.link_button(label, url, use_container_width=True)
+                st.markdown(
+                    f'<a class="sf-doclink" href="{url}" target="_blank" rel="noopener noreferrer">{label}</a>',
+                    unsafe_allow_html=True,
+                )
             else:
                 local_path = resolve_local_path(url)
                 if local_path and local_path.exists():
-                    data = load_file_bytes(local_path)
-                    mime = mime_for_path(local_path)
-                    st.download_button(
-                        label,
-                        data=data,
-                        file_name=local_path.name,
-                        mime=mime,
-                        use_container_width=True,
+                    file_href = f"/docs/{quote(local_path.name)}"
+                    st.markdown(
+                        f'<a class="sf-doclink" href="{file_href}" target="_blank" rel="noopener noreferrer">{label}</a>',
+                        unsafe_allow_html=True,
                     )
 
 
@@ -262,6 +289,11 @@ def sanitize_display_text(x: str | None) -> str:
     raw = html.unescape((x or "").strip())
     no_tags = re.sub(r"<[^>]+>", "", raw)
     return no_tags.strip()
+
+
+def strip_html(x: str | None) -> str:
+    raw = html.unescape((x or "").strip())
+    return re.sub(r"<[^>]+>", "", raw).strip()
 
 
 def is_url(value: str | None) -> bool:
@@ -291,7 +323,7 @@ def mime_for_path(path: Path) -> str:
 
 
 def to_sentence_case(text: str) -> str:
-    cleaned = sanitize_display_text(text)
+    cleaned = strip_html(text)
     letters = [c for c in cleaned if c.isalpha()]
     if not letters:
         return cleaned
@@ -490,7 +522,7 @@ with tab1:
     # Search bar (clean)
     q = st.text_input(
         "",
-        placeholder="Search AFI number, title, tags, or use case…",
+        placeholder="Search AFI number, title, tags, or use case...",
         label_visibility="collapsed",
     )
 
@@ -510,24 +542,24 @@ with tab1:
         idx = st.session_state.open_idx
         if 0 <= idx < len(afi):
             a = afi[idx]
-            pub = sanitize_display_text(a.get("pub"))
+            pub = strip_html(a.get("pub"))
             title = to_sentence_case(a.get("title") or "")
             st.markdown(f"### {pub} — {title}" if pub else f"### {title}")
 
             why = (a.get("why_it_matters") or "").strip()
             if why:
-                st.write(sanitize_display_text(why))
+                st.write(strip_html(why))
 
             use_cases = a.get("use_cases", []) or []
             if use_cases:
                 st.markdown("#### Use cases")
                 for uc in use_cases[:8]:
-                    st.markdown(f"- {sanitize_display_text(uc)}")
+                    st.markdown(f"- {strip_html(uc)}")
 
             notes = (a.get("notes") or "").strip()
             if notes:
                 st.markdown("#### Notes")
-                st.write(sanitize_display_text(notes))
+                st.write(strip_html(notes))
 
             render_links_as_buttons(a.get("official_links", []) or [])
 
@@ -550,11 +582,11 @@ with tab1:
         for i, a in enumerate(afi):
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
             border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
-            pub = sanitize_display_text(a.get("pub"))
+            pub = strip_html(a.get("pub"))
             title = to_sentence_case(a.get("title") or "")
             display_title = f"{pub} — {title}" if pub else title
-            summary = sanitize_display_text(a.get("why_it_matters"))
-            tags_html = render_tags(a.get("tags", []) or [])
+            summary = strip_html(a.get("why_it_matters"))
+            tags_html = render_tags([strip_html(t) for t in (a.get("tags", []) or [])])
 
             token = make_open_token("afi", i)
             official_links = a.get("official_links", []) or []
@@ -636,7 +668,7 @@ with tab2:
 
             summary = (t.get("summary") or "").strip()
             if summary:
-                st.write(sanitize_display_text(summary))
+                st.write(strip_html(summary))
 
             render_links_as_buttons(t.get("official_links", []) or [])
 
@@ -659,7 +691,7 @@ with tab2:
             bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
             border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
             title = to_sentence_case(t.get("title") or "")
-            summary = sanitize_display_text(t.get("summary"))
+            summary = strip_html(t.get("summary"))
             tags_html = ""
             doc_type = to_sentence_case(t.get("type") or "")
 
@@ -682,27 +714,18 @@ with tab2:
                 </div>
             """
 
+            st.markdown(card_html, unsafe_allow_html=True)
             if external_url:
                 st.markdown(
-                    f"""
-                    <a class="sf-rowlink" href="{external_url}"{target}>
-                      {card_html}
-                    </a>
-                    """,
+                    f'<a class="sf-doclink" href="{external_url}" target="_blank" rel="noopener noreferrer">Open link</a>',
                     unsafe_allow_html=True,
                 )
-            else:
-                st.markdown(card_html, unsafe_allow_html=True)
-                if has_local_file:
-                    data = load_file_bytes(local_path)
-                    st.download_button(
-                        "Open file",
-                        data=data,
-                        file_name=local_path.name,
-                        mime=mime_for_path(local_path),
-                        use_container_width=True,
-                        key=f"toolkit_open_{i}",
-                    )
+            elif has_local_file:
+                file_href = f"/docs/{quote(local_path.name)}"
+                st.markdown(
+                    f'<a class="sf-doclink" href="{file_href}" target="_blank" rel="noopener noreferrer">Open document</a>',
+                    unsafe_allow_html=True,
+                )
 
 # ----------------------------
 # Tab 3: Ask Super Friend
@@ -719,7 +742,7 @@ with tab3:
     with st.form("ask_form"):
         question = st.text_area(
             "Question",
-            placeholder="Ask MSC Super Friend a question…",
+            placeholder="Ask a question (e.g., 'Where can I find DHA policy on …?')",
             height=90,
             label_visibility="collapsed",
         )
