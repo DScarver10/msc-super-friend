@@ -115,6 +115,57 @@ st.markdown(
         padding: 10px 12px !important;
         text-align: left !important;
       }
+      .sf-row-list{
+        border: 1px solid #CBD5E1;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .sf-row-card{
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px 12px;
+        border-bottom: 1px solid #CBD5E1;
+      }
+      .sf-row-card:last-child{ border-bottom: none; }
+      .sf-row-card.even{ background: rgba(128, 0, 32, 0.06); }
+      .sf-row-card.odd{ background: #F2F4F6; }
+      .sf-row-link{ display:block; text-decoration:none !important; color: inherit !important; }
+      .sf-row-wrap{ position: relative; }
+      .sf-row-wrap [data-testid="stDownloadButton"]{
+        position: absolute;
+        inset: 0;
+      }
+      .sf-row-wrap [data-testid="stDownloadButton"] > button{
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        margin: 0;
+        padding: 0;
+        border: none;
+        background: transparent;
+      }
+      .sf-tag{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: 500;
+        border-radius: 999px;
+        background: rgba(0,0,0,0.08);
+        color: #374151;
+        white-space: nowrap;
+      }
+      .sf-title-text{
+        font-weight: 600;
+        color: #111827;
+      }
+      .sf-desc-text{
+        font-size: 13px;
+        color: #6b7280;
+        margin-top: 4px;
+      }
       .sf-table-tool_list [data-testid="stLinkButton"] > a,
       .sf-table-tool_list [data-testid="stDownloadButton"] > button{
         font-weight: 600;
@@ -414,36 +465,46 @@ def render_card_button(
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_table_list(rows: list[dict], list_id: str) -> None:
-    st.markdown(f'<div class="sf-table sf-table-{list_id}">', unsafe_allow_html=True)
-    for i, row in enumerate(rows):
-        row_class = "odd" if i % 2 else "even"
-        st.markdown(f'<div class="sf-table-row {row_class}">', unsafe_allow_html=True)
-        if row.get("data") is not None:
-            st.download_button(
-                row["label"],
-                data=row["data"],
-                file_name=row["file_name"],
-                mime=row["mime"],
-                use_container_width=True,
-                key=f"{list_id}_dl_{i}",
-            )
-        else:
-            try:
-                st.link_button(row["label"], row["url"], use_container_width=True, key=f"{list_id}_ln_{i}")
-            except TypeError:
-                try:
-                    st.link_button(row["label"], row["url"], key=f"{list_id}_ln_{i}")
-                except TypeError:
-                    st.link_button(row["label"], row["url"])
-        desc = row.get("desc") or ""
-        if desc:
-            st.markdown(f"<div class='tool-card-desc'>{escape_html(strip_html(desc))}</div>", unsafe_allow_html=True)
-        tag = row.get("tag") or ""
-        if tag:
-            st.markdown(f"<span class='sf-tag'>{escape_html(strip_html(tag))}</span>", unsafe_allow_html=True)
+def render_row_card(
+    title: str,
+    desc: str,
+    tag: str,
+    row_class: str,
+    url: str | None = None,
+    data: bytes | None = None,
+    file_name: str | None = None,
+    mime: str | None = None,
+    key: str = "",
+) -> None:
+    safe_title = escape_html(strip_html(title))
+    safe_desc = escape_html(strip_html(desc))
+    safe_tag = escape_html(strip_html(tag))
+    card_body = f"""
+        <div class="sf-row-card {row_class}">
+          {f"<div class='sf-tag'>{safe_tag}</div>" if safe_tag else ""}
+          <div>
+            <div class="sf-title-text">{safe_title}</div>
+            {f"<div class='sf-desc-text'>{safe_desc}</div>" if safe_desc else ""}
+          </div>
+        </div>
+    """
+    if url:
+        st.markdown(
+            f'<a class="sf-row-link" href="{url}" target="_blank" rel="noopener noreferrer">{card_body}</a>',
+            unsafe_allow_html=True,
+        )
+    elif data is not None and file_name and mime:
+        st.markdown('<div class="sf-row-wrap">', unsafe_allow_html=True)
+        st.markdown(card_body, unsafe_allow_html=True)
+        st.download_button(
+            "Download",
+            data=data,
+            file_name=file_name,
+            mime=mime,
+            use_container_width=True,
+            key=key,
+        )
         st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def is_url(value: str | None) -> bool:
@@ -767,11 +828,10 @@ with tab1:
             st.rerun()
 
     else:
-        # LIST VIEW (plain text cards)
-        rows = []
+        # LIST VIEW (row cards)
+        st.markdown('<div class="sf-row-list">', unsafe_allow_html=True)
         for i, a in enumerate(afi):
-            bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
-            border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
+            row_class = "even" if i % 2 == 0 else "odd"
             pub = strip_html(a.get("pub"))
             title = to_sentence_case(a.get("title") or "")
             display_title = f"{pub} — {title}" if pub else title
@@ -783,21 +843,26 @@ with tab1:
             local_path = (APP_ROOT / "docs" / Path(raw_link).name) if is_local_doc(raw_link) else None
             has_local_file = bool(local_path and local_path.exists())
 
-            label = strip_html(display_title)
-
             if external_url:
-                rows.append({"label": label, "url": external_url, "tag": tag_label})
-            elif has_local_file:
-                rows.append(
-                    {
-                        "label": label,
-                        "tag": tag_label,
-                        "data": load_file_bytes(local_path),
-                        "file_name": local_path.name,
-                        "mime": mime_for_path(local_path),
-                    }
+                render_row_card(
+                    title=display_title,
+                    desc=summary,
+                    tag=tag_label,
+                    row_class=row_class,
+                    url=external_url,
                 )
-        render_table_list(rows, "doc_list")
+            elif has_local_file:
+                render_row_card(
+                    title=display_title,
+                    desc=summary,
+                    tag=tag_label,
+                    row_class=row_class,
+                    data=load_file_bytes(local_path),
+                    file_name=local_path.name,
+                    mime=mime_for_path(local_path),
+                    key=f"doc_dl_{i}",
+                )
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ----------------------------
 # Tab 2: MSC Toolkit
@@ -875,10 +940,9 @@ with tab2:
 
     else:
         # LIST VIEW
-        rows = []
+        st.markdown('<div class="sf-row-list">', unsafe_allow_html=True)
         for i, t in enumerate(toolkit):
-            bg = "var(--surface)" if i % 2 == 0 else "var(--surface2)"
-            border_color = "var(--border)" if i % 2 == 0 else "rgba(128, 0, 32, 0.22)"
+            row_class = "even" if i % 2 == 0 else "odd"
             title = to_sentence_case(t.get("title") or "")
             summary = strip_html(t.get("summary"))
             doc_type = to_sentence_case(t.get("type") or "")
@@ -888,21 +952,27 @@ with tab2:
             external_url = primary_link if is_url(primary_link) else ""
             local_path = (APP_ROOT / "docs" / Path(primary_link).name) if is_local_doc(primary_link) else None
             has_local_file = bool(local_path and local_path.exists())
-            label = strip_html(title)
+
             if external_url:
-                rows.append({"label": label, "url": external_url, "tag": doc_type, "desc": summary})
-            elif has_local_file:
-                rows.append(
-                    {
-                        "label": label,
-                        "tag": doc_type,
-                        "desc": summary,
-                        "data": load_file_bytes(local_path),
-                        "file_name": local_path.name,
-                        "mime": mime_for_path(local_path),
-                    }
+                render_row_card(
+                    title=title,
+                    desc=summary,
+                    tag=doc_type,
+                    row_class=row_class,
+                    url=external_url,
                 )
-        render_table_list(rows, "tool_list")
+            elif has_local_file:
+                render_row_card(
+                    title=title,
+                    desc=summary,
+                    tag=doc_type,
+                    row_class=row_class,
+                    data=load_file_bytes(local_path),
+                    file_name=local_path.name,
+                    mime=mime_for_path(local_path),
+                    key=f"tool_dl_{i}",
+                )
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ----------------------------
 # Tab 3: Ask Super Friend
