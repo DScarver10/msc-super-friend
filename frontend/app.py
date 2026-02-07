@@ -48,6 +48,18 @@ if THEME_CSS_PATH.exists():
 st.markdown(
     """
     <style>
+    /* Fix input text color (mobile + desktop) */
+    .stTextInput input,
+    .stTextArea textarea {
+        color: #111111 !important;
+        -webkit-text-fill-color: #111111 !important;
+    }
+
+    /* Placeholder text stays subtle */
+    .stTextInput input::placeholder,
+    .stTextArea textarea::placeholder {
+        color: #9aa0a6 !important;
+    }
       a.sf-rowlink { text-decoration: none !important; color: inherit !important; display:block; }
       a.sf-rowlink:visited { color: inherit !important; }
       a.sf-rowlink:active { color: inherit !important; }
@@ -131,20 +143,6 @@ st.markdown(
       .sf-row-card.even{ background: rgba(128, 0, 32, 0.06); }
       .sf-row-card.odd{ background: #F2F4F6; }
       .sf-row-link{ display:block; text-decoration:none !important; color: inherit !important; }
-      .sf-row-wrap{ position: relative; }
-      .sf-row-wrap [data-testid="stDownloadButton"]{
-        position: absolute;
-        inset: 0;
-      }
-      .sf-row-wrap [data-testid="stDownloadButton"] > button{
-        width: 100%;
-        height: 100%;
-        opacity: 0;
-        margin: 0;
-        padding: 0;
-        border: none;
-        background: transparent;
-      }
       .sf-tag{
         display: inline-flex;
         align-items: center;
@@ -494,17 +492,12 @@ def render_row_card(
             unsafe_allow_html=True,
         )
     elif data is not None and file_name and mime:
-        st.markdown('<div class="sf-row-wrap">', unsafe_allow_html=True)
-        st.markdown(card_body, unsafe_allow_html=True)
-        st.download_button(
-            "Download",
-            data=data,
-            file_name=file_name,
-            mime=mime,
-            use_container_width=True,
-            key=key,
+        b64 = b64encode(data).decode("ascii")
+        href = f"data:{mime};base64,{b64}"
+        st.markdown(
+            f'<a class="sf-row-link" href="{href}" download="{escape_html(file_name)}">{card_body}</a>',
+            unsafe_allow_html=True,
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def is_url(value: str | None) -> bool:
