@@ -1,0 +1,28 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --msc-navy: #0b3c5d;
+  --msc-burgundy: #7a0019;
+  --msc-slate: #475569;
+  --msc-bg: #f2f4f6;
+  --msc-card: #ffffff;
+  --msc-muted: #94a3b8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--msc-bg);
+  color: #111827;
+}
+
+a {
+  color: inherit;
+}
