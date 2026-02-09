@@ -96,6 +96,24 @@ export default function AskSuperFriendPage() {
 
   return (
     <section className="space-y-4 sm:space-y-5">
+      <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="mt-0.5 h-5 w-5 text-msc-navy"
+          aria-hidden="true"
+        >
+          <rect x="4" y="5" width="16" height="12" rx="2" />
+          <path d="M9 21h6M12 17v4M9 10h.01M15 10h.01M9 13c.8.7 1.8 1 3 1s2.2-.3 3-1" />
+        </svg>
+        <p className="text-sm text-slate-800">
+          Hi! I&apos;m MSC Super Friend. Ask me to find guidance, summarize references, or point you to the right AFI
+          or DHA publication.
+        </p>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <label htmlFor="ask-input" className="block text-sm font-medium text-slate-900">
           Ask a question

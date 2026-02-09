@@ -30,6 +30,7 @@ const ACRONYMS = [
   "MSC",
   "PDF",
   "TOPA",
+  "TRICARE",
   "RMO",
   "MEPRS",
   "MEPERS",
@@ -92,21 +93,28 @@ function titleCaseWordSegment(segment: string, isEdgeWord: boolean): string {
     return segment;
   }
 
-  const lower = segment.toLowerCase();
-  const matchedAcronym = ACRONYMS.find((acronym) => acronym.toLowerCase() === lower);
-  if (matchedAcronym) {
-    return matchedAcronym;
-  }
-
-  if (!isEdgeWord && TITLECASE_SMALL_WORDS.has(lower)) {
-    return lower;
-  }
-
-  if (!/[a-z]/i.test(segment)) {
+  const leading = (segment.match(/^[^A-Za-z0-9]*/) || [""])[0];
+  const trailing = (segment.match(/[^A-Za-z0-9]*$/) || [""])[0];
+  const core = segment.slice(leading.length, segment.length - trailing.length);
+  if (!core) {
     return segment;
   }
 
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
+  const lower = core.toLowerCase();
+  const matchedAcronym = ACRONYMS.find((acronym) => acronym.toLowerCase() === lower);
+  if (matchedAcronym) {
+    return `${leading}${matchedAcronym}${trailing}`;
+  }
+
+  if (!isEdgeWord && TITLECASE_SMALL_WORDS.has(lower)) {
+    return `${leading}${lower}${trailing}`;
+  }
+
+  if (!/[a-z]/i.test(core)) {
+    return segment;
+  }
+
+  return `${leading}${lower.charAt(0).toUpperCase()}${lower.slice(1)}${trailing}`;
 }
 
 function toPublicationTitleCase(value: string | null | undefined): string {
@@ -374,7 +382,7 @@ export function getToolkitItems(): UiItem[] {
     const ordered: UiItem[] = [
       {
         id: "toolkit-afms-landing",
-        title: "AFMS MSC Landing Page",
+        title: "AFMS MSC Offical Web Page",
         description: "Official AFMS Medical Service Corps page.",
         tag: "Official",
         type: "external",
