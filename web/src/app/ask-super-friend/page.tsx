@@ -122,7 +122,7 @@ export default function AskSuperFriendPage() {
           id="ask-input"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Hi! I'm MSC Super Friend. Ask me to find guidance, summarize references, or point you to the right AFI or DHA publication."
+          placeholder="What is an MSC?"
           rows={4}
           disabled={isLoading}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-black placeholder:text-slate-500 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:bg-slate-100"
