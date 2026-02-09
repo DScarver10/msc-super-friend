@@ -37,6 +37,14 @@ const ACRONYMS = [
 ];
 const TITLECASE_SMALL_WORDS = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "of", "on", "or", "the", "to", "with"]);
 
+function applyAcronymCasing(value: string): string {
+  let result = value;
+  for (const acronym of ACRONYMS) {
+    result = result.replace(new RegExp(`\\b${acronym}\\b`, "gi"), acronym);
+  }
+  return result;
+}
+
 function pathExists(filePath: string): boolean {
   return fs.existsSync(filePath);
 }
@@ -81,11 +89,7 @@ function toSentenceCase(value: string | null | undefined): string {
     result = lower.charAt(0).toUpperCase() + lower.slice(1);
   }
 
-  for (const acronym of ACRONYMS) {
-    result = result.replace(new RegExp(`\\b${acronym.toLowerCase()}\\b`, "gi"), acronym);
-  }
-
-  return result;
+  return applyAcronymCasing(result);
 }
 
 function titleCaseWordSegment(segment: string, isEdgeWord: boolean): string {
@@ -124,7 +128,7 @@ function toPublicationTitleCase(value: string | null | undefined): string {
   }
 
   const words = cleaned.split(/\s+/);
-  return words
+  const titled = words
     .map((word, wordIndex) => {
       const isEdgeWord = wordIndex === 0 || wordIndex === words.length - 1;
       const parts = word.split(/([/-])/);
@@ -138,6 +142,8 @@ function toPublicationTitleCase(value: string | null | undefined): string {
         .join("");
     })
     .join(" ");
+
+  return applyAcronymCasing(titled);
 }
 
 function toLinkInfo(rawHref: string | null | undefined): Pick<UiItem, "type" | "href" | "filename"> | null {

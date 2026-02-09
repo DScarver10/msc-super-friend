@@ -9,15 +9,13 @@
 };
 
 type CardListProps = {
-  title: string;
   items: CardListItem[];
   emptyMessage?: string;
 };
 
-export function CardList({ title, items, emptyMessage = "No items yet." }: CardListProps) {
+export function CardList({ items, emptyMessage = "No items yet." }: CardListProps) {
   return (
     <section className="space-y-3">
-      {title ? <h3 className="text-base font-medium text-slate-800">{title}</h3> : null}
       {items.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
           {emptyMessage}
