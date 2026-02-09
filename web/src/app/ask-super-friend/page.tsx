@@ -20,11 +20,8 @@ type AskResponse = {
   citations?: Citation[];
 };
 
-function getErrorMessage(status: number, body: unknown): string {
-  if (body && typeof body === "object" && "detail" in body && typeof body.detail === "string") {
-    return body.detail;
-  }
-  return `Request failed (${status}). Please try again.`;
+function getErrorMessage(_status: number, _body: unknown): string {
+  return "Chat mode currently offline.";
 }
 
 export default function AskSuperFriendPage() {
@@ -47,7 +44,7 @@ export default function AskSuperFriendPage() {
     }
 
     if (!apiBaseUrl) {
-      setError("NEXT_PUBLIC_API_BASE_URL is not set.");
+      setError("Chat mode currently offline.");
       return;
     }
 
@@ -88,8 +85,10 @@ export default function AskSuperFriendPage() {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to get an answer right now.";
-      setError(message);
+      if (err instanceof Error) {
+        console.error("Ask request failed:", err.message);
+      }
+      setError("Chat mode currently offline.");
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +96,6 @@ export default function AskSuperFriendPage() {
 
   return (
     <section className="space-y-4 sm:space-y-5">
-      <h2 className="text-lg font-semibold sm:text-xl">Ask Super Friend</h2>
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <p className="text-sm text-slate-800">
           Hi! I&apos;m MSC Super Friend. Ask me to find guidance, summarize references, or point you to the right AFI
@@ -114,7 +112,7 @@ export default function AskSuperFriendPage() {
           id="ask-input"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Ask MSC Super Friend a question…"
+          placeholder="Hi! I'm MSC Super Friend. Ask me to find guidance, summarize references, or point you to the right AFI or DHA publication."
           rows={4}
           disabled={isLoading}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-black placeholder:text-slate-500 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:bg-slate-100"

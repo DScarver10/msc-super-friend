@@ -38,7 +38,7 @@ export function CardList({ title, items, emptyMessage = "No items yet." }: CardL
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-bold sm:text-base">{item.title}</p>
-                  <p className={`mt-1 text-xs sm:text-sm ${descClass}`}>{item.description}</p>
+                  {item.description ? <p className={`mt-1 text-xs sm:text-sm ${descClass}`}>{item.description}</p> : null}
                 </div>
               </div>
             );

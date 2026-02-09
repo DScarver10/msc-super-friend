@@ -30,6 +30,7 @@ const ACRONYMS = [
   "MSC",
   "PDF",
   "TOPA",
+  "RMO",
   "MEPRS",
   "MEPERS",
 ];
@@ -263,7 +264,7 @@ export function getDoctrineItems(): UiItem[] {
       }
 
       const combinedTitle = cleanText(pub ? `${pub} - ${title}` : title) || `Doctrine Item ${idx + 1}`;
-      const description = `${tag} doctrine reference.`;
+      const description = "";
 
       return [
         {

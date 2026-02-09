@@ -49,7 +49,6 @@ function SettingsRow({
 export default function SettingsPage() {
   const [toast, setToast] = useState<ToastState>(null);
   const rateUrl = (process.env.NEXT_PUBLIC_RATE_URL || "").trim();
-  const appVersion = (process.env.NEXT_PUBLIC_APP_VERSION || "").trim() || "dev";
 
   async function handleShare() {
     const url = typeof window !== "undefined" ? window.location.origin : "";
@@ -91,11 +90,6 @@ export default function SettingsPage() {
         <SettingsRow icon={<ShareIcon className="h-4 w-4" />} label="Share app" onClick={handleShare} />
         <SettingsRow icon={<DocumentIcon className="h-4 w-4" />} label="Privacy policy" href="/privacy" />
         <SettingsRow icon={<InfoIcon className="h-4 w-4" />} label="About" href="/about" />
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
-        <p className="font-medium text-slate-700">Version</p>
-        <p>{appVersion}</p>
       </div>
 
       {toast ? (
