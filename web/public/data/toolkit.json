@@ -1,0 +1,212 @@
+[
+  {
+    "title": "DHA Policies (Reference Center)",
+    "summary": "Authoritative directory for DHA policies and memoranda. Use for policy lookup and governance alignment.",
+    "type": "Policy",
+    "tags": ["Policy"],
+    "official_links": [
+      {
+        "label": "Open DHA Policies",
+        "url": "https://www.health.mil/Reference-Center/Policies"
+      }
+    ],
+    "description": "Authoritative directory for DHA policies and memoranda. Use for policy lookup and governance alignment.",
+    "category": "Policy",
+    "web_links": [
+      {
+        "label": "Open DHA Policies",
+        "url": "https://www.health.mil/Reference-Center/Policies"
+      }
+    ],
+    "files": []
+  },
+  {
+    "title": "DoD Issuances — DoD Instructions (DoDIs)",
+    "summary": "Official DoD Instructions directory for cross-cutting compliance and governance references.",
+    "type": "Policy",
+    "tags": ["Policy"],
+    "official_links": [
+      {
+        "label": "Open DoDI Directory",
+        "url": "https://www.esd.whs.mil/Directives/issuances/dodi/"
+      }
+    ],
+    "description": "Official DoD Instructions directory for cross-cutting compliance and governance references.",
+    "category": "Policy",
+    "web_links": [
+      {
+        "label": "Open DoDI Directory",
+        "url": "https://www.esd.whs.mil/Directives/issuances/dodi/"
+      }
+    ],
+    "files": []
+  },
+  {
+    "title": "AFMS Manpower Reference Guide",
+    "summary": "Local reference for manpower and staffing decisions. Keep this embedded for fast access and CAC-free use.",
+    "type": "Manpower",
+    "tags": ["Manpower"],
+    "official_links": [
+      {
+        "label": "Open file",
+        "url": "docs/AFMS Manpower Reference Guide.xlsx"
+      }
+    ],
+    "description": "Local reference for manpower and staffing decisions. Keep this embedded for fast access and CAC-free use.",
+    "category": "Manpower",
+    "web_links": [],
+    "files": [
+      {
+        "label": "Download (Excel)",
+        "path": "AFMS Manpower Reference Guide.xlsx"
+      }
+    ]
+  },
+  {
+    "title": "AFSC Enlisted Quick Reference Guide (DAFECD) — 31 Oct 2025",
+    "summary": "Enlisted AFSC quick reference guide for force structure coordination and manpower/career alignment.",
+    "type": "Career Management",
+    "tags": ["Career Management"],
+    "official_links": [
+      {
+        "label": "Open file",
+        "url": "docs/AFSC Enlisted Quick Reference Guide from DAFECD (31 Oct 2025).pdf"
+      }
+    ],
+    "description": "Enlisted AFSC quick reference guide for force structure coordination and manpower/career alignment.",
+    "category": "Career Management",
+    "web_links": [],
+    "files": [
+      {
+        "label": "Download (PDF)",
+        "path": "AFSC Enlisted Quick Reference Guide from DAFECD (31 Oct 2025).pdf"
+      }
+    ]
+  },
+  {
+    "title": "AFSC Officer Quick Reference Guide (DAFOCD) — 31 Oct 2025",
+    "summary": "Officer AFSC quick reference guide for career field identification and planning.",
+    "type": "Career Management",
+    "tags": ["Career Management"],
+    "official_links": [
+      {
+        "label": "Open file",
+        "url": "docs/AFSC Officer Quick Reference Guide from DAFOCD (31 Oct 2025).pdf"
+      }
+    ],
+    "description": "Officer AFSC quick reference guide for career field identification and planning.",
+    "category": "Career Management",
+    "web_links": [],
+    "files": [
+      {
+        "label": "Download (PDF)",
+        "path": "AFSC Officer Quick Reference Guide from DAFOCD (31 Oct 2025).pdf"
+      }
+    ]
+  },
+  {
+    "title": "MSC Accession Guide (AY2026)",
+    "summary": "Local accession guide PDF for MSC applicants and leaders supporting accession timelines, requirements, and process steps.",
+    "type": "Accessions",
+    "tags": ["Accessions"],
+    "official_links": [
+      {
+        "label": "Open file",
+        "url": "docs/AY2026_Accession_Guide_1770150076.pdf"
+      }
+    ],
+    "description": "Local accession guide PDF for MSC applicants and leaders supporting accession timelines, requirements, and process steps.",
+    "category": "Accessions",
+    "web_links": [],
+    "files": [
+      {
+        "label": "Download (PDF)",
+        "path": "AY2026_Accession_Guide_1770150076.pdf"
+      }
+    ]
+  },
+  {
+    "title": "200414 - MSC Mentor Guide",
+    "summary": "Mentor guide for MSC professional development and career support.",
+    "type": "Professional Development",
+    "tags": ["Mentorship", "Professional Development"],
+    "official_links": [
+      {
+        "label": "Open file",
+        "url": "docs/200414 - MSC Mentor Guide.pdf"
+      }
+    ],
+    "description": "Mentor guide for MSC professional development and career support.",
+    "category": "Professional Development",
+    "web_links": [],
+    "files": [
+      {
+        "label": "Download (PDF)",
+        "path": "200414 - MSC Mentor Guide.pdf"
+      }
+    ]
+  },
+  {
+    "title": "MSC Career Progression Chart-Narrative Guide (ao Jan 2023)",
+    "summary": "Career progression chart and narrative guide for MSC members.",
+    "type": "Career Management",
+    "tags": ["Career Management"],
+    "official_links": [
+      {
+        "label": "Open file",
+        "url": "docs/MSC Career Progression Chart-Narrative Guide (ao Jan 2023).pdf"
+      }
+    ],
+    "description": "Career progression chart and narrative guide for MSC members.",
+    "category": "Career Management",
+    "web_links": [],
+    "files": [
+      {
+        "label": "Download (PDF)",
+        "path": "MSC Career Progression Chart-Narrative Guide (ao Jan 2023).pdf"
+      }
+    ]
+  },
+  {
+    "title": "AFMEDCOM Quick Reference",
+    "summary": "Quick reference for AFMEDCOM structure and key contacts.",
+    "type": "Reference",
+    "tags": ["Reference", "AFMEDCOM"],
+    "official_links": [
+      {
+        "label": "Open file",
+        "url": "docs/AFMEDCOM Quick Reference.pdf"
+      }
+    ],
+    "description": "Quick reference for AFMEDCOM structure and key contacts.",
+    "category": "Reference",
+    "web_links": [],
+    "files": [
+      {
+        "label": "Download (PDF)",
+        "path": "AFMEDCOM Quick Reference.pdf"
+      }
+    ]
+  },
+  {
+    "title": "DHA Network Structure",
+    "summary": "Overview of the DHA network structure and organizational relationships.",
+    "type": "Organization",
+    "tags": ["DHA", "Organization"],
+    "official_links": [
+      {
+        "label": "Open file",
+        "url": "docs/DHA Network Structure.pdf"
+      }
+    ],
+    "description": "Overview of the DHA network structure and organizational relationships.",
+    "category": "Organization",
+    "web_links": [],
+    "files": [
+      {
+        "label": "Download (PDF)",
+        "path": "DHA Network Structure.pdf"
+      }
+    ]
+  }
+]

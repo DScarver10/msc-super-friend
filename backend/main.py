@@ -40,6 +40,40 @@ DOCS_DIR = Path(getattr(settings, "docs_dir", "")) if getattr(settings, "docs_di
 DOCS_DIR = DOCS_DIR.resolve()
 
 
+def _doc_roots() -> list[Path]:
+    repo_root = Path(__file__).resolve().parents[1]
+    roots = [
+        DOCS_DIR,
+        (repo_root / "backend" / "data" / "toolkit_docs").resolve(),
+        (repo_root / "frontend" / "docs").resolve(),
+    ]
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for root in roots:
+        key = str(root)
+        if key not in seen:
+            seen.add(key)
+            unique.append(root)
+    return unique
+
+
+def _resolve_doc_path(file_path: str) -> Path | None:
+    rel = Path(file_path)
+    if ".." in rel.parts:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    for root in _doc_roots():
+        candidate = (root / rel).resolve()
+        if str(candidate).startswith(str(root)) and candidate.exists() and candidate.is_file():
+            return candidate
+
+        # Fallback: allow /docs/<filename> style lookups by basename.
+        by_name = (root / rel.name).resolve()
+        if str(by_name).startswith(str(root)) and by_name.exists() and by_name.is_file():
+            return by_name
+    return None
+
+
 class FeedbackEvent(BaseModel):
     vote: str                  # "up" | "down" | "down_note"
     question_id: str
@@ -96,18 +130,18 @@ def health():
 
 @app.get("/docs/{file_path:path}")
 def serve_docs(file_path: str):
-    # Prevent path traversal
-    if ".." in Path(file_path).parts:
-        raise HTTPException(status_code=400, detail="Invalid path")
-    resolved = (DOCS_DIR / file_path).resolve()
-    if not str(resolved).startswith(str(DOCS_DIR)):
-        raise HTTPException(status_code=400, detail="Invalid path")
-    if not resolved.exists() or not resolved.is_file():
+    resolved = _resolve_doc_path(file_path)
+    if not resolved:
         raise HTTPException(status_code=404, detail="File not found")
+
+    media_type = "application/pdf"
+    if resolved.suffix.lower() == ".xlsx":
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
     headers = {"Content-Disposition": f'inline; filename="{resolved.name}"'}
     return FileResponse(
         path=str(resolved),
-        media_type="application/pdf",
+        media_type=media_type,
         headers=headers,
     )
 

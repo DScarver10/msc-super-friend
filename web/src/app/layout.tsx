@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import Image from "next/image";
 import { BottomNav } from "@/components/BottomNav";
-import { GearIcon } from "@/components/icons";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
@@ -34,7 +32,7 @@ export default function RootLayout({
         <ServiceWorkerRegister />
         <div className="mx-auto min-h-screen max-w-5xl px-4 py-4 pb-24 sm:px-6 sm:pb-6">
           <header className="mb-4 rounded-xl border border-slate-200 bg-msc-card p-4 shadow-sm">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center">
               <Image
                 src="/msc.png"
                 alt="MSC Super Friend"
@@ -43,13 +41,6 @@ export default function RootLayout({
                 priority
                 className="h-auto w-full max-w-[340px] rounded-md sm:max-w-[420px]"
               />
-              <Link
-                href="/settings"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-msc-slate hover:text-msc-burgundy"
-                aria-label="Settings"
-              >
-                <GearIcon className="h-5 w-5" />
-              </Link>
             </div>
           </header>
           <main>{children}</main>

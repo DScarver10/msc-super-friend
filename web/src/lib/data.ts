@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { doctrineMockItems, toolkitMockItems } from "@/data/mockData";
+import { toolkitMockItems } from "@/data/mockData";
 
 export type UiItem = {
   id: string;
@@ -19,6 +19,7 @@ type CsvRow = Record<string, string>;
 
 const ACRONYMS = [
   "AFI",
+  "DAFI",
   "AFMAN",
   "DAFMAN",
   "JTR",
@@ -40,6 +41,10 @@ function pathExists(filePath: string): boolean {
 
 function resolveContentFile(relativePath: string): string | null {
   const candidates = [
+    path.resolve(process.cwd(), "public", "data", relativePath),
+    path.resolve(process.cwd(), "web", "public", "data", relativePath),
+    path.resolve(process.cwd(), "src", "data", relativePath),
+    path.resolve(process.cwd(), "web", "src", "data", relativePath),
     path.resolve(process.cwd(), "frontend", "content", relativePath),
     path.resolve(process.cwd(), "..", "frontend", "content", relativePath),
   ];
@@ -238,10 +243,9 @@ function parseCsv(csvText: string): CsvRow[] {
 }
 
 export function getDoctrineItems(): UiItem[] {
-  const fallback = normalizeFallback(doctrineMockItems);
   const csvPath = resolveContentFile("afi41_seed.csv");
   if (!csvPath) {
-    return fallback;
+    return [];
   }
 
   try {
@@ -274,9 +278,9 @@ export function getDoctrineItems(): UiItem[] {
       ];
     });
 
-    return items.length > 0 ? items : fallback;
+    return items;
   } catch {
-    return fallback;
+    return [];
   }
 }
 
@@ -331,16 +335,53 @@ export function getToolkitItems(): UiItem[] {
       return fallback;
     }
 
-    const afmsLanding: UiItem = {
-      id: "toolkit-afms-landing",
-      title: "AFMS MSC Landing Page",
-      description: "Official AFMS Medical Service Corps page.",
-      tag: "Official",
-      type: "external",
-      href: "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/",
+    const byTitle = (needle: string) => items.find((item) => item.title.toLowerCase().includes(needle.toLowerCase()));
+    const used = new Set<string>();
+    const pick = (needle: string, titleOverride?: string): UiItem | null => {
+      const found = byTitle(needle);
+      if (!found || used.has(found.id)) {
+        return null;
+      }
+      used.add(found.id);
+      return {
+        ...found,
+        title: titleOverride || found.title,
+      };
     };
 
-    return [afmsLanding, ...items.filter((item) => item.href !== afmsLanding.href)];
+    const ordered: UiItem[] = [
+      {
+        id: "toolkit-afms-landing",
+        title: "AFMS MSC Landing Page",
+        description: "Official AFMS Medical Service Corps page.",
+        tag: "Official",
+        type: "external",
+        href: "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/",
+      },
+      {
+        id: "toolkit-dha-strategy",
+        title: "DHA Strategy Overview",
+        description: "DHA strategic priorities and organizational direction.",
+        tag: "Strategy",
+        type: "external",
+        href: "https://www.dha.mil/About-DHA/DHA-Strategy",
+      },
+    ];
+
+    const selected = [
+      pick("DHA Policies", "DHA Policy Reference Center"),
+      pick("DoD Issuances", "DoD Instructions Directory"),
+      pick("MSC Mentor Guide"),
+      pick("AFMEDCOM Quick Reference", "AFMED Quick Reference"),
+      pick("AFSC Officer Quick Reference", "AFSC Officer Quick Reference"),
+      pick("AFSC Enlisted Quick Reference", "AFSC Enlisted Quick Reference"),
+      pick("AFMS Manpower Reference Guide"),
+      pick("MSC Accession Guide", "AY26 Accession Guide"),
+      pick("DHA Network Structure"),
+      pick("MSC Career Progression", "MSC Career Path"),
+    ].filter((item): item is UiItem => item !== null);
+
+    return [...ordered, ...selected];
   } catch {
     return fallback;
   }

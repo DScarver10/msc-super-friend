@@ -95,6 +95,39 @@ def docs_dir() -> Path:
     return (repo_root / configured).resolve()
 
 
+def _doc_roots() -> list[Path]:
+    repo_root = Path(__file__).resolve().parents[1]
+    roots = [
+        docs_dir(),
+        (repo_root / "backend" / "data" / "toolkit_docs").resolve(),
+        (repo_root / "frontend" / "docs").resolve(),
+    ]
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for root in roots:
+        key = str(root)
+        if key not in seen:
+            seen.add(key)
+            unique.append(root)
+    return unique
+
+
+def _resolve_doc_path(file_path: str) -> Path | None:
+    rel = Path(file_path)
+    if ".." in rel.parts:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    for root in _doc_roots():
+        candidate = (root / rel).resolve()
+        if str(candidate).startswith(str(root)) and candidate.exists() and candidate.is_file():
+            return candidate
+
+        by_name = (root / rel.name).resolve()
+        if str(by_name).startswith(str(root)) and by_name.exists() and by_name.is_file():
+            return by_name
+    return None
+
+
 def _docs_url(local_path: str | None) -> str | None:
     if not local_path:
         return None
@@ -120,17 +153,15 @@ def health() -> dict[str, str]:
 
 @app.get("/docs/{file_path:path}")
 def serve_docs(file_path: str):
-    if ".." in Path(file_path).parts:
-        raise HTTPException(status_code=400, detail="Invalid path")
-
-    root = docs_dir()
-    resolved = (root / file_path).resolve()
-    if not str(resolved).startswith(str(root.resolve())):
-        raise HTTPException(status_code=400, detail="Invalid path")
-    if not resolved.exists() or not resolved.is_file():
+    resolved = _resolve_doc_path(file_path)
+    if not resolved:
         raise HTTPException(status_code=404, detail="File not found")
 
-    return FileResponse(path=str(resolved))
+    media_type = "application/pdf"
+    if resolved.suffix.lower() == ".xlsx":
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    return FileResponse(path=str(resolved), media_type=media_type)
 
 
 @app.post("/ask")
