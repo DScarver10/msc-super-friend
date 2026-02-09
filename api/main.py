@@ -125,6 +125,13 @@ def _resolve_doc_path(file_path: str) -> Path | None:
         by_name = (root / rel.name).resolve()
         if str(by_name).startswith(str(root)) and by_name.exists() and by_name.is_file():
             return by_name
+
+        # Case-insensitive fallback for Linux hosts when source names vary in case.
+        target = rel.name.casefold()
+        if root.exists():
+            for child in root.iterdir():
+                if child.is_file() and child.name.casefold() == target:
+                    return child.resolve()
     return None
 
 
