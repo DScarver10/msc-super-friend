@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -50,6 +51,20 @@ def _env(name: str, default: str = "") -> str:
         # Handle UTF-8 BOM-prefixed first key in .env files.
         value = os.getenv(f"\ufeff{name}", default)
     return str(value).strip()
+
+
+cors_origins_raw = _env("CORS_ALLOW_ORIGINS", "*")
+cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+if not cors_origins:
+    cors_origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def index_dir() -> Path:

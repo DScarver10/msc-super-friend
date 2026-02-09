@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { BottomNav } from "@/components/BottomNav";
 import { GearIcon } from "@/components/icons";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import "./globals.css";
-
-const tabs = [
-  { href: "/doctrine-library", label: "Doctrine Library" },
-  { href: "/msc-toolkit", label: "MSC Toolkit" },
-  { href: "/ask-super-friend", label: "Ask Super Friend" },
-];
 
 export const metadata: Metadata = {
   title: {
@@ -40,7 +35,14 @@ export default function RootLayout({
         <div className="mx-auto min-h-screen max-w-5xl px-4 py-4 pb-24 sm:px-6 sm:pb-6">
           <header className="mb-4 rounded-xl border border-slate-200 bg-msc-card p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <h1 className="text-xl font-semibold text-msc-navy sm:text-2xl">MSC Super Friend</h1>
+              <Image
+                src="/msc.png"
+                alt="MSC Super Friend"
+                width={640}
+                height={140}
+                priority
+                className="h-auto w-full max-w-[340px] rounded-md sm:max-w-[420px]"
+              />
               <Link
                 href="/settings"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-msc-slate hover:text-msc-burgundy"
@@ -49,22 +51,11 @@ export default function RootLayout({
                 <GearIcon className="h-5 w-5" />
               </Link>
             </div>
-            <nav className="mt-4 overflow-x-auto">
-              <ul className="flex min-w-max gap-2">
-                {tabs.map((tab) => (
-                  <li key={tab.href}>
-                    <Link
-                      href={tab.href}
-                      className="inline-flex rounded-full border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-medium text-msc-slate hover:border-msc-navy hover:text-msc-navy"
-                    >
-                      {tab.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
           </header>
           <main>{children}</main>
+          <footer className="mt-8 border-t border-slate-300 pt-4 pb-2 text-center text-xs text-slate-500">
+            Built for MSCs | Version 1.0
+          </footer>
         </div>
         <BottomNav />
       </body>

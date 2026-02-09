@@ -406,7 +406,7 @@ def render_tags(tags: list[str] | None):
     tags = tags or []
     if not tags:
         return ""
-    safe = [f"<span class='sf-tag'>{html.escape(sanitize_display_text(t))}</span>" for t in tags[:6]]
+    safe = [f"<span class='sf-tag'>{html.escape(clean_text(t))}</span>" for t in tags[:6]]
     return f"<div class='sf-tags'>{''.join(safe)}</div>"
 
 
@@ -414,15 +414,15 @@ def safe_text(x: str | None) -> str:
     return html.escape((x or "").strip())
 
 
-def sanitize_display_text(x: str | None) -> str:
-    raw = html.unescape((x or "").strip())
+def clean_text(s: str | None) -> str:
+    if s is None:
+        return ""
+    raw = html.unescape(str(s))
     no_tags = re.sub(r"<[^>]+>", "", raw)
-    return no_tags.strip()
-
-
-def strip_html(x: str | None) -> str:
-    raw = html.unescape((x or "").strip())
-    return re.sub(r"<[^>]+>", "", raw).strip()
+    collapsed = " ".join(no_tags.split()).strip()
+    if collapsed in ("/a", "/div", "/span", "a", "div", "span"):
+        return ""
+    return collapsed
 
 
 def escape_html(x: str | None) -> str:
@@ -474,9 +474,9 @@ def render_row_card(
     mime: str | None = None,
     key: str = "",
 ) -> None:
-    safe_title = escape_html(strip_html(title))
-    safe_desc = escape_html(strip_html(desc))
-    safe_tag = escape_html(strip_html(tag))
+    safe_title = escape_html(clean_text(title))
+    safe_desc = escape_html(clean_text(desc))
+    safe_tag = escape_html(clean_text(tag))
     card_body = f"""
         <div class="sf-row-card {row_class}">
           {f"<div class='sf-tag'>{safe_tag}</div>" if safe_tag else ""}
@@ -564,7 +564,7 @@ def mime_for_path(path: Path) -> str:
 
 
 def to_sentence_case(text: str) -> str:
-    cleaned = strip_html(text)
+    cleaned = clean_text(text)
     letters = [c for c in cleaned if c.isalpha()]
     if not letters:
         return cleaned
@@ -785,24 +785,24 @@ with tab1:
         idx = st.session_state.open_idx
         if 0 <= idx < len(afi):
             a = afi[idx]
-            pub = strip_html(a.get("pub"))
+            pub = clean_text(a.get("pub"))
             title = to_sentence_case(a.get("title") or "")
             st.markdown(f"### {pub} — {title}" if pub else f"### {title}")
 
             why = (a.get("why_it_matters") or "").strip()
             if why:
-                st.write(strip_html(why))
+                st.write(clean_text(why))
 
             use_cases = a.get("use_cases", []) or []
             if use_cases:
                 st.markdown("#### Use cases")
                 for uc in use_cases[:8]:
-                    st.markdown(f"- {strip_html(uc)}")
+                    st.markdown(f"- {clean_text(uc)}")
 
             notes = (a.get("notes") or "").strip()
             if notes:
                 st.markdown("#### Notes")
-                st.write(strip_html(notes))
+                st.write(clean_text(notes))
 
             render_links_as_buttons(a.get("official_links", []) or [])
 
@@ -825,11 +825,11 @@ with tab1:
         st.markdown('<div class="sf-row-list">', unsafe_allow_html=True)
         for i, a in enumerate(afi):
             row_class = "even" if i % 2 == 0 else "odd"
-            pub = strip_html(a.get("pub"))
+            pub = clean_text(a.get("pub"))
             title = to_sentence_case(a.get("title") or "")
             display_title = f"{pub} — {title}" if pub else title
-            summary = strip_html(a.get("why_it_matters"))
-            tag_label = strip_html((a.get("tags", []) or [""])[0]) if a.get("tags") else ""
+            summary = clean_text(a.get("why_it_matters"))
+            tag_label = clean_text((a.get("tags", []) or [""])[0]) if a.get("tags") else ""
             official_links = a.get("official_links", []) or []
             raw_link = official_links[0].get("url") if official_links else ""
             external_url = raw_link if is_url(raw_link) else ""
@@ -914,7 +914,7 @@ with tab2:
 
             summary = (t.get("summary") or "").strip()
             if summary:
-                st.write(strip_html(summary))
+                st.write(clean_text(summary))
 
             render_links_as_buttons(t.get("official_links", []) or [])
 
@@ -937,7 +937,7 @@ with tab2:
         for i, t in enumerate(toolkit):
             row_class = "even" if i % 2 == 0 else "odd"
             title = to_sentence_case(t.get("title") or "")
-            summary = strip_html(t.get("summary"))
+            summary = clean_text(t.get("summary"))
             doc_type = to_sentence_case(t.get("type") or "")
 
             official_links = t.get("official_links", []) or []

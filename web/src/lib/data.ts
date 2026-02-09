@@ -17,7 +17,22 @@ export type UiItem = {
 
 type CsvRow = Record<string, string>;
 
-const ACRONYMS = ["AFI", "DHA", "DOD", "AFMS", "MSC", "PDF"];
+const ACRONYMS = [
+  "AFI",
+  "AFMAN",
+  "DAFMAN",
+  "JTR",
+  "DHA",
+  "DAF",
+  "DOD",
+  "AFMS",
+  "MSC",
+  "PDF",
+  "TOPA",
+  "MEPRS",
+  "MEPERS",
+];
+const TITLECASE_SMALL_WORDS = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "of", "on", "or", "the", "to", "with"]);
 
 function pathExists(filePath: string): boolean {
   return fs.existsSync(filePath);
@@ -66,6 +81,51 @@ function toSentenceCase(value: string | null | undefined): string {
   return result;
 }
 
+function titleCaseWordSegment(segment: string, isEdgeWord: boolean): string {
+  if (!segment) {
+    return segment;
+  }
+
+  const lower = segment.toLowerCase();
+  const matchedAcronym = ACRONYMS.find((acronym) => acronym.toLowerCase() === lower);
+  if (matchedAcronym) {
+    return matchedAcronym;
+  }
+
+  if (!isEdgeWord && TITLECASE_SMALL_WORDS.has(lower)) {
+    return lower;
+  }
+
+  if (!/[a-z]/i.test(segment)) {
+    return segment;
+  }
+
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+function toPublicationTitleCase(value: string | null | undefined): string {
+  const cleaned = cleanText(value);
+  if (!cleaned) {
+    return "";
+  }
+
+  const words = cleaned.split(/\s+/);
+  return words
+    .map((word, wordIndex) => {
+      const isEdgeWord = wordIndex === 0 || wordIndex === words.length - 1;
+      const parts = word.split(/([/-])/);
+      return parts
+        .map((part) => {
+          if (part === "/" || part === "-") {
+            return part;
+          }
+          return titleCaseWordSegment(part, isEdgeWord);
+        })
+        .join("");
+    })
+    .join(" ");
+}
+
 function toLinkInfo(rawHref: string | null | undefined): Pick<UiItem, "type" | "href" | "filename"> | null {
   const href = cleanText(rawHref);
   if (!href) {
@@ -83,9 +143,21 @@ function toLinkInfo(rawHref: string | null | undefined): Pick<UiItem, "type" | "
 
   return {
     type: "local",
-    href: `/docs/${encodeURIComponent(filename)}`,
+    href: buildLocalDocUrl(filename),
     filename,
   };
+}
+
+function apiBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
+}
+
+function buildLocalDocUrl(filename: string): string {
+  const base = apiBaseUrl();
+  if (!base) {
+    return `/docs/${encodeURIComponent(filename)}`;
+  }
+  return `${base}/docs/${encodeURIComponent(filename)}`;
 }
 
 function normalizeFallback(items: Array<Omit<UiItem, "filename"> & { filename?: string }>): UiItem[] {
@@ -177,8 +249,8 @@ export function getDoctrineItems(): UiItem[] {
     const rows = parseCsv(csvText);
 
     const items = rows.flatMap((row, idx): UiItem[] => {
-      const pub = toSentenceCase(row.pub);
-      const title = toSentenceCase(row.title);
+      const pub = toPublicationTitleCase(row.pub);
+      const title = toPublicationTitleCase(row.title);
       const tag = toSentenceCase(row.msc_functional_area) || "Doctrine";
       const linkInfo = toLinkInfo(row.official_publication_pdf);
 
@@ -255,7 +327,20 @@ export function getToolkitItems(): UiItem[] {
       ];
     });
 
-    return items.length > 0 ? items : fallback;
+    if (items.length === 0) {
+      return fallback;
+    }
+
+    const afmsLanding: UiItem = {
+      id: "toolkit-afms-landing",
+      title: "AFMS MSC Landing Page",
+      description: "Official AFMS Medical Service Corps page.",
+      tag: "Official",
+      type: "external",
+      href: "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/",
+    };
+
+    return [afmsLanding, ...items.filter((item) => item.href !== afmsLanding.href)];
   } catch {
     return fallback;
   }

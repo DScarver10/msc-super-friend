@@ -25,16 +25,20 @@ export function CardList({ title, items, emptyMessage = "No items yet." }: CardL
       ) : (
         <ul className="space-y-2">
           {items.map((item, index) => {
-            const bgClass = index % 2 === 0 ? "bg-slate-100" : "bg-[#f8eef1]";
-            const cardClass = `block w-full rounded-lg border border-slate-200 p-4 shadow-sm transition hover:bg-slate-50 active:scale-[0.998] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 ${bgClass}`;
+            const isBurgundy = index % 2 === 1;
+            const bgClass = isBurgundy ? "bg-[#5a0013]" : "bg-slate-100";
+            const textClass = isBurgundy ? "text-white" : "text-slate-900";
+            const descClass = isBurgundy ? "text-slate-200" : "text-slate-600";
+            const pillClass = isBurgundy ? "bg-white/15 text-white" : "bg-slate-200 text-slate-700";
+            const cardClass = `block w-full rounded-lg border border-slate-200 p-4 shadow-sm transition hover:opacity-95 active:scale-[0.998] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 ${bgClass} ${textClass}`;
             const content = (
               <div className="flex items-start gap-3">
-                <span className="mt-0.5 inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                <span className={`mt-0.5 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${pillClass}`}>
                   {item.tag}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-900 sm:text-base">{item.title}</p>
-                  <p className="mt-1 text-xs text-slate-600 sm:text-sm">{item.description}</p>
+                  <p className="text-sm font-bold sm:text-base">{item.title}</p>
+                  <p className={`mt-1 text-xs sm:text-sm ${descClass}`}>{item.description}</p>
                 </div>
               </div>
             );
@@ -46,7 +50,7 @@ export function CardList({ title, items, emptyMessage = "No items yet." }: CardL
                     {content}
                   </a>
                 ) : (
-                  <a href={item.href} download={item.filename || true} className={cardClass}>
+                  <a href={item.href} target="_blank" rel="noopener noreferrer" className={cardClass}>
                     {content}
                   </a>
                 )}

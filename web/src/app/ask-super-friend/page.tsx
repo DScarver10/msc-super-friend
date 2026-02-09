@@ -98,6 +98,13 @@ export default function AskSuperFriendPage() {
   return (
     <section className="space-y-4 sm:space-y-5">
       <h2 className="text-lg font-semibold sm:text-xl">Ask Super Friend</h2>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <p className="text-sm text-slate-800">
+          Hi! I&apos;m MSC Super Friend. Ask me to find guidance, summarize references, or point you to the right AFI
+          or DHA publication.
+        </p>
+        <p className="mt-2 text-xs text-slate-600">Public Sources only. Do not enter PHI/PII.</p>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <label htmlFor="ask-input" className="block text-sm font-medium text-slate-900">
