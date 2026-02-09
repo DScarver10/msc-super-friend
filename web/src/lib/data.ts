@@ -154,6 +154,27 @@ function toLinkInfo(rawHref: string | null | undefined): Pick<UiItem, "type" | "
   };
 }
 
+function doctrineLinkInfo(rawHref: string | null | undefined): Pick<UiItem, "type" | "href" | "filename"> | null {
+  const href = cleanText(rawHref);
+  if (!href) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(href)) {
+    const maybeName = path.basename(href.split("?")[0]).trim();
+    if (maybeName && maybeName.toLowerCase().endsWith(".pdf")) {
+      return {
+        type: "local",
+        href: buildLocalDocUrl(maybeName),
+        filename: maybeName,
+      };
+    }
+    return { type: "external", href };
+  }
+
+  return toLinkInfo(href);
+}
+
 function apiBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
 }
@@ -257,7 +278,7 @@ export function getDoctrineItems(): UiItem[] {
       const pub = toPublicationTitleCase(row.pub);
       const title = toPublicationTitleCase(row.title);
       const tag = toSentenceCase(row.msc_functional_area) || "Doctrine";
-      const linkInfo = toLinkInfo(row.official_publication_pdf);
+      const linkInfo = doctrineLinkInfo(row.official_publication_pdf);
 
       if (!linkInfo) {
         return [];

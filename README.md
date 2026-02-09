@@ -47,6 +47,8 @@ See `web/.env.example`.
 ## Utility Scripts
 - Copy docs into Next.js public folder:
   - `python scripts/copy_docs.py`
+- Download/sync Doctrine PDFs for offline use:
+  - `python scripts/sync_doctrine_docs.py`
 - Build RAG index:
   - `python scripts/build_index.py`
 - API smoke test (`POST /ask`):
