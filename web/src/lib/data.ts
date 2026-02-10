@@ -388,7 +388,7 @@ export function getToolkitItems(): UiItem[] {
     const ordered: UiItem[] = [
       {
         id: "toolkit-afms-landing",
-        title: "AFMS MSC Offical Web Page",
+        title: "AFMS MSC Official Web Page",
         description: "Official AFMS Medical Service Corps page.",
         tag: "Official",
         type: "external",
