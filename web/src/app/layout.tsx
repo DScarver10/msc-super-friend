@@ -37,7 +37,7 @@ export default function RootLayout({
       <body className="bg-msc-bg text-slate-900">
         <ServiceWorkerRegister />
         <div className="mx-auto min-h-screen max-w-5xl px-4 py-4 pb-24 sm:px-6 sm:pb-6">
-          <header className="mb-4 rounded-xl border border-slate-200 bg-[linear-gradient(135deg,_#ffffff,_#f8fafc)] px-4 py-2 shadow-sm">
+          <header className="mb-4 rounded-xl border border-slate-200 bg-[linear-gradient(135deg,_#ffffff,_#f8fafc)] px-3 py-1.5 shadow-sm">
             <div className="flex items-center justify-center">
               <Link
                 href="/"
@@ -50,7 +50,7 @@ export default function RootLayout({
                   width={640}
                   height={140}
                   priority
-                  className="h-24 w-full max-w-[640px] rounded-md object-contain sm:h-28 sm:max-w-[760px]"
+                  className="h-28 w-full max-w-[700px] rounded-md object-contain sm:h-32 sm:max-w-[820px]"
                 />
               </Link>
             </div>
