@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SEED_CSV = ROOT / "scripts" / "afi41_seed.csv"
+SEED_CSV = ROOT / "web" / "public" / "data" / "afi41_seed.csv"
 OUTPUT_JSON = ROOT / "frontend" / "content" / "doctrine_afi41.json"
 
 print(">>> GENERATOR STARTED")

@@ -50,7 +50,7 @@ export default function RootLayout({
           </header>
           <main>{children}</main>
           <footer className="mt-8 border-t border-slate-300 pt-4 pb-2 text-center text-xs text-slate-500">
-            {appVersion}
+            MSC Super Companion | Version {appVersion} | Powered by Next.js 14.2.5
           </footer>
         </div>
         <BottomNav />

@@ -1,0 +1,14 @@
+[
+  {
+    "question": "What guidance covers medical readiness program requirements?",
+    "expected_sources": ["AFI 41-106"]
+  },
+  {
+    "question": "Which publication addresses medical care management?",
+    "expected_sources": ["AFI 44-102"]
+  },
+  {
+    "question": "Where can I find emergency management program policy?",
+    "expected_sources": ["DAFI 10-2501"]
+  }
+]

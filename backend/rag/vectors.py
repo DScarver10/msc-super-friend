@@ -32,6 +32,12 @@ class ChunkRecord:
     local_path: str | None = None
     page: int | None = None
     chunk_index: int | None = None
+    section: str | None = None
+    subsection: str | None = None
+    pub: str | None = None
+    domain: str | None = None
+    doc_type: str | None = None
+    effective_date: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)

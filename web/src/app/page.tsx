@@ -4,7 +4,7 @@ const QUICK_LINKS = [
   {
     href: "/doctrine-library",
     title: "Doctrine Library",
-    description: "Browse AFI/DAFI publications and open the in-app document viewer.",
+    description: "Browse official publications and open the in-app document viewer.",
     tone: "bg-slate-100 text-slate-900",
   },
   {
@@ -24,16 +24,6 @@ const QUICK_LINKS = [
 export default function HomePage() {
   return (
     <section className="space-y-5">
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="bg-[radial-gradient(circle_at_top_right,_#dbeafe,_transparent_55%),linear-gradient(135deg,_#f8fafc,_#eef2ff)] p-5 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-msc-navy">MSC Super Companion</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">Your mission-ready policy workspace</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-700">
-            Use Doctrine for official publications, Toolkit for trusted resources, and Ask for grounded answers.
-          </p>
-        </div>
-      </div>
-
       <div className="grid gap-3 sm:grid-cols-3">
         {QUICK_LINKS.map((item) => (
           <Link

@@ -110,6 +110,11 @@ class Citation(BaseModel):
     url: Optional[str] = None
     local_path: Optional[str] = None
     page: Optional[int] = None
+    section: Optional[str] = None
+    subsection: Optional[str] = None
+    pub: Optional[str] = None
+    domain: Optional[str] = None
+    doc_type: Optional[str] = None
     score: float
 
 
@@ -134,6 +139,16 @@ def _is_grounded(evidence: list[Citation], answer: str, min_top_score: float) ->
     if max((c.score for c in evidence), default=0.0) < min_top_score:
         return False
     return _answer_has_citation_markers(answer)
+
+
+def _citation_has_locator(citation: Citation) -> bool:
+    if citation.page is not None:
+        return True
+    if citation.section and citation.section.strip():
+        return True
+    if citation.subsection and citation.subsection.strip():
+        return True
+    return False
 
 
 def _write_retrieval_trace(payload: dict) -> str:
@@ -265,10 +280,21 @@ def ask(req: AskRequest):
                 url=e.url,
                 local_path=e.local_path,
                 page=e.page,
+                section=e.section,
+                subsection=e.subsection,
+                pub=e.pub,
+                domain=e.domain,
+                doc_type=e.doc_type,
                 score=e.score,
             )
             for e in evidence
         ]
+
+        # Prefer fewer precise citations over many weak ones.
+        precise_citations = [c for c in citations if _citation_has_locator(c)]
+        precise_citations.sort(key=lambda c: c.score, reverse=True)
+        citations = precise_citations[:3]
+
         grounded = _is_grounded(citations, answer_text, min_top_score=min_top_score)
         if not grounded:
             answer_text = "Insufficient evidence in the indexed sources."

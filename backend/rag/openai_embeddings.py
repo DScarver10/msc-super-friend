@@ -20,12 +20,46 @@ def _embed_texts_with_client(client: OpenAI, model: str, texts: List[str]) -> np
     if not texts:
         return np.empty((0, 0), dtype=np.float32)
 
-    response = client.embeddings.create(
-        model=model,
-        input=texts,
-    )
+    # Keep each request below model token-per-request limits by batching inputs.
+    # Approximation: 1 token ~= 4 chars for mixed English/policy text.
+    max_batch_tokens = 220_000
+    max_batch_items = 64
+    max_batch_chars = max_batch_tokens * 4
 
-    vectors = [item.embedding for item in response.data]
+    vectors: list[list[float]] = []
+    batch: list[str] = []
+    batch_chars = 0
+
+    def flush_batch() -> None:
+        nonlocal batch, batch_chars, vectors
+        if not batch:
+            return
+        response = client.embeddings.create(
+            model=model,
+            input=batch,
+        )
+        vectors.extend([item.embedding for item in response.data])
+        batch = []
+        batch_chars = 0
+
+    for text in texts:
+        cleaned = (text or "").strip()
+        if not cleaned:
+            cleaned = " "
+
+        text_chars = len(cleaned)
+        if batch and (len(batch) >= max_batch_items or (batch_chars + text_chars) > max_batch_chars):
+            flush_batch()
+
+        # If one input is very large, keep the tail but ensure we still embed something deterministic.
+        if text_chars > max_batch_chars:
+            cleaned = cleaned[:max_batch_chars]
+            text_chars = len(cleaned)
+
+        batch.append(cleaned)
+        batch_chars += text_chars
+
+    flush_batch()
     return np.array(vectors, dtype=np.float32)
 
 

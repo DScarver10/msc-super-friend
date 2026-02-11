@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
-SEED_CSV = ROOT / "frontend" / "content" / "afi41_seed.csv"
+SEED_CSV = ROOT / "web" / "public" / "data" / "afi41_seed.csv"
 FRONTEND_DOCS = ROOT / "frontend" / "docs"
 BACKEND_DOCS = ROOT / "backend" / "data" / "toolkit_docs"
 WEB_PUBLIC_DOCS = ROOT / "web" / "public" / "docs"

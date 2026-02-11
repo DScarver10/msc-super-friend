@@ -63,8 +63,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur sm:hidden">
-      <ul className="mx-auto flex max-w-5xl items-center justify-between px-2 py-1">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
+      <ul className="mx-auto flex max-w-5xl items-center justify-between px-2 py-1.5">
         {tabs.map((tab) => {
           const active = tab.match.some((m) => pathname === m || (m !== "/" && pathname.startsWith(`${m}/`)));
           const textClass = active ? "text-msc-burgundy" : "text-msc-slate";
@@ -72,7 +72,9 @@ export function BottomNav() {
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
-                className={`flex min-h-14 w-full flex-col items-center justify-center gap-1 rounded-lg text-xs font-medium ${textClass}`}
+                className={`flex min-h-14 w-full flex-col items-center justify-center gap-1 rounded-lg px-1 text-xs font-semibold ${textClass} ${
+                  active ? "bg-[#f8eef1]" : ""
+                }`}
               >
                 {tab.icon()}
                 <span>{tab.label}</span>
