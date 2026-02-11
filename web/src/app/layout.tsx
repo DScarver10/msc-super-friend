@@ -50,7 +50,7 @@ export default function RootLayout({
                   width={640}
                   height={140}
                   priority
-                  className="h-28 w-full max-w-[700px] rounded-md object-contain sm:h-32 sm:max-w-[820px]"
+                  className="h-56 w-full max-w-[1400px] rounded-md object-contain sm:h-64 sm:max-w-[1640px]"
                 />
               </Link>
             </div>
