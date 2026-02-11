@@ -46,7 +46,8 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
 
   const viewerUrl = useMemo(() => {
     if (activeIndex < 0 || activeIndex >= results.length) {
-      return buildViewerUrl(src, null, query);
+      // Keep default viewer state at full document (no forced page jump).
+      return src;
     }
     return buildViewerUrl(src, results[activeIndex].page, query);
   }, [activeIndex, query, results, src]);
@@ -70,7 +71,8 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
       const payload = (await response.json()) as SearchResponse;
       const hits = Array.isArray(payload.results) ? payload.results : [];
       setResults(hits);
-      setActiveIndex(hits.length > 0 ? 0 : -1);
+      // Do not auto-jump; let the user choose a specific hit.
+      setActiveIndex(-1);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Search unavailable.";
       setSearchError(message);
@@ -164,4 +166,3 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
     </div>
   );
 }
-

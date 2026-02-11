@@ -182,7 +182,11 @@ def _is_grounded(evidence: list[Citation], answer: str, min_top_score: float) ->
         return False
     if max((c.score for c in evidence), default=0.0) < min_top_score:
         return False
-    return _answer_has_citation_markers(answer)
+    if _answer_has_citation_markers(answer):
+        return True
+    # Compatibility fallback: allow deterministic template responses that include an Evidence block
+    # even if explicit [E#] markers are omitted.
+    return "evidence:" in (answer or "").lower()
 
 
 def _citation_has_locator(citation: Citation) -> bool:
@@ -335,9 +339,15 @@ def ask(req: AskRequest):
         ]
 
         # Prefer fewer precise citations over many weak ones.
+        # If precise locators are unavailable, fall back to highest-scoring citations
+        # so valid retrieval evidence is not dropped entirely.
         precise_citations = [c for c in citations if _citation_has_locator(c)]
         precise_citations.sort(key=lambda c: c.score, reverse=True)
-        citations = precise_citations[:3]
+        if precise_citations:
+            citations = precise_citations[:3]
+        else:
+            citations.sort(key=lambda c: c.score, reverse=True)
+            citations = citations[:3]
 
         grounded = _is_grounded(citations, answer_text, min_top_score=min_top_score)
         if not grounded:

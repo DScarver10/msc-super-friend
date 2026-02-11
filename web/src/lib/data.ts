@@ -193,8 +193,12 @@ function doctrineLinkInfo(rawHref: string | null | undefined): Pick<UiItem, "typ
   return toLinkInfo(href);
 }
 
-function buildLocalDocUrl(filename: string): string {
-  return `/docs/${encodeURIComponent(filename)}`;
+function buildLocalDocUrl(filename: string, from?: "doctrine" | "toolkit"): string {
+  const base = `/docs/${encodeURIComponent(filename)}`;
+  if (!from) {
+    return base;
+  }
+  return `${base}?from=${from}`;
 }
 
 function resolveLocalDocPath(filename: string): string | null {
@@ -265,7 +269,7 @@ function getUnlistedDoctrineLocalItems(existingFilenames: Set<string>, startIdx:
         description: "",
         tag: "Doctrine",
         type: "local",
-        href: buildLocalDocUrl(filename),
+        href: buildLocalDocUrl(filename, "doctrine"),
         filename,
       });
     }
@@ -392,7 +396,7 @@ export function getDoctrineItems(): UiItem[] {
           description,
           tag,
           type: linkInfo.type,
-          href: linkInfo.href,
+          href: linkInfo.type === "local" && linkInfo.filename ? buildLocalDocUrl(linkInfo.filename, "doctrine") : linkInfo.href,
           filename: linkInfo.filename,
         },
       ];
@@ -449,7 +453,7 @@ export function getToolkitItems(): UiItem[] {
           description,
           tag,
           type: linkInfo.type,
-          href: linkInfo.href,
+          href: linkInfo.type === "local" && linkInfo.filename ? buildLocalDocUrl(linkInfo.filename, "toolkit") : linkInfo.href,
           filename: linkInfo.filename,
         },
       ];

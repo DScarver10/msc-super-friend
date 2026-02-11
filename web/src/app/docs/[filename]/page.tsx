@@ -8,6 +8,9 @@ type DocsPageProps = {
   params: {
     filename: string;
   };
+  searchParams?: {
+    from?: string;
+  };
 };
 
 function resolveLocalDoc(filename: string): string | null {
@@ -35,12 +38,15 @@ function buildSourceUrl(filename: string): string {
   return `/api/docs/${encodeURIComponent(filename)}`;
 }
 
-export default function DocsViewerPage({ params }: DocsPageProps) {
+export default function DocsViewerPage({ params, searchParams }: DocsPageProps) {
   const filename = decodeURIComponent(params.filename);
   const src = buildSourceUrl(filename);
   const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
   const localDocPath = resolveLocalDoc(filename);
   const localUnavailable = !apiBase && !localDocPath;
+  const from = (searchParams?.from || "").toLowerCase();
+  const backHref = from === "toolkit" ? "/msc-toolkit" : "/doctrine-library";
+  const backLabel = from === "toolkit" ? "Back to toolkit" : "Back to library";
 
   return (
     <section className="space-y-4">
@@ -64,10 +70,10 @@ export default function DocsViewerPage({ params }: DocsPageProps) {
             Download
           </a>
           <Link
-            href="/doctrine-library"
+            href={backHref}
             className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
           >
-            Back to library
+            {backLabel}
           </Link>
         </div>
       </header>

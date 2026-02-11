@@ -13,6 +13,7 @@ type MetaRecord = {
   page?: number | null;
   section?: string | null;
   subsection?: string | null;
+  pub?: string | null;
 };
 
 function safeFilename(value: string): string | null {
@@ -44,6 +45,29 @@ async function loadMetaRecords(): Promise<MetaRecord[]> {
   return [];
 }
 
+function normalizeKey(value: string): string {
+  return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function buildDocAliases(filename: string): string[] {
+  const lower = filename.toLowerCase();
+  const noExt = path.parse(lower).name;
+  const aliases = new Set<string>([lower, noExt, normalizeKey(lower), normalizeKey(noExt)]);
+
+  const policyMatch = noExt.match(/^([a-z]+)\s*(\d{1,2})[-_ ]?(\d{2,4}(?:\.\d+)?)$/i);
+  if (policyMatch) {
+    const prefix = policyMatch[1].toUpperCase();
+    const partA = policyMatch[2];
+    const partB = policyMatch[3];
+    aliases.add(`${prefix} ${partA}-${partB}`.toLowerCase());
+    aliases.add(`${prefix}${partA}-${partB}`.toLowerCase());
+    aliases.add(normalizeKey(`${prefix}${partA}-${partB}`));
+    aliases.add(normalizeKey(`${prefix} ${partA}-${partB}`));
+  }
+
+  return Array.from(aliases).filter(Boolean);
+}
+
 function scoreChunk(text: string, queryTerms: string[]): number {
   const haystack = text.toLowerCase();
   let score = 0;
@@ -58,6 +82,21 @@ function scoreChunk(text: string, queryTerms: string[]): number {
     }
   }
   return score;
+}
+
+function exactMatchCount(text: string, query: string): number {
+  const haystack = (text || "").toLowerCase();
+  const needle = (query || "").toLowerCase().trim();
+  if (!needle) {
+    return 0;
+  }
+  let count = 0;
+  let idx = haystack.indexOf(needle);
+  while (idx !== -1) {
+    count += 1;
+    idx = haystack.indexOf(needle, idx + needle.length);
+  }
+  return count;
 }
 
 function buildSnippet(text: string, query: string, maxLen = 260): string {
@@ -95,12 +134,42 @@ export async function GET(request: NextRequest, context: { params: { filename: s
     .map((term) => term.trim())
     .filter((term) => term.length >= 2);
 
-  const basenameNoExt = path.parse(filename).name.toLowerCase();
+  const aliases = buildDocAliases(filename);
   const records = await loadMetaRecords();
   const matches = records.filter((record) => {
-    const source = `${record.source_id || ""} ${record.url || ""} ${record.local_path || ""}`.toLowerCase();
-    return source.includes(filename.toLowerCase()) || source.includes(basenameNoExt);
+    const source = `${record.source_id || ""} ${record.title || ""} ${record.pub || ""} ${record.url || ""} ${
+      record.local_path || ""
+    }`.toLowerCase();
+    const sourceNorm = normalizeKey(source);
+    return aliases.some((alias) => source.includes(alias) || sourceNorm.includes(normalizeKey(alias)));
   });
+
+  const exactScored = matches
+    .map((record) => {
+      const text = (record.text || "").trim();
+      const score = exactMatchCount(text, query);
+      return { record, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20)
+    .map(({ record }) => ({
+      chunk_id: record.chunk_id,
+      title: (record.title || filename).trim(),
+      snippet: buildSnippet(record.text || "", query),
+      page: typeof record.page === "number" ? record.page : null,
+      section: record.section || null,
+      subsection: record.subsection || null,
+    }));
+
+  if (exactScored.length > 0) {
+    return NextResponse.json({
+      query,
+      count: exactScored.length,
+      match_type: "exact",
+      results: exactScored,
+    });
+  }
 
   const scored = matches
     .map((record) => {
@@ -123,7 +192,7 @@ export async function GET(request: NextRequest, context: { params: { filename: s
   return NextResponse.json({
     query,
     count: scored.length,
+    match_type: "token",
     results: scored,
   });
 }
-
