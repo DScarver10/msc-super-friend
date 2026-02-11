@@ -37,16 +37,20 @@ export default function RootLayout({
       <body className="bg-msc-bg text-slate-900">
         <ServiceWorkerRegister />
         <div className="mx-auto min-h-screen max-w-5xl px-4 py-4 pb-24 sm:px-6 sm:pb-6">
-          <header className="mb-4 rounded-xl border border-slate-200 bg-[linear-gradient(135deg,_#ffffff,_#f8fafc)] p-4 shadow-sm">
-            <div className="flex items-center">
-              <Link href="/" aria-label="Go to homepage" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-md">
+          <header className="mb-4 rounded-xl border border-slate-200 bg-[linear-gradient(135deg,_#ffffff,_#f8fafc)] px-4 py-2 shadow-sm">
+            <div className="flex items-center justify-center">
+              <Link
+                href="/"
+                aria-label="Go to homepage"
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-md"
+              >
                 <Image
                   src="/msc.png"
                   alt="MSC Super Companion"
                   width={640}
                   height={140}
                   priority
-                  className="h-20 w-full max-w-[560px] rounded-md object-contain sm:h-24 sm:max-w-[680px]"
+                  className="h-24 w-full max-w-[640px] rounded-md object-contain sm:h-28 sm:max-w-[760px]"
                 />
               </Link>
             </div>
