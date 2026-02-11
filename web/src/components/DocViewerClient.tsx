@@ -69,13 +69,14 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <iframe
-            title={`Viewer: ${filename}`}
-            src={viewerUrl}
-            className="h-[calc(100vh-15rem)] min-h-[560px] w-full border-0"
-            loading="lazy"
-            style={{ overflow: "auto", WebkitOverflowScrolling: "touch" }}
-          />
+          <object data={viewerUrl} type="application/pdf" className="h-[82vh] min-h-[680px] w-full">
+            <iframe
+              title={`Viewer: ${filename}`}
+              src={viewerUrl}
+              className="h-[82vh] min-h-[680px] w-full border-0"
+              loading="lazy"
+            />
+          </object>
         </div>
       )}
     </div>
