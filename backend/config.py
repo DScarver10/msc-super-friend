@@ -40,7 +40,7 @@ def load_settings() -> Settings:
         toolkit_docs_dir=os.getenv(
             "TOOLKIT_DOCS_DIR", str(root / "backend" / "data" / "toolkit_docs")
         ).strip(),
-        docs_dir=os.getenv("DOCS_DIR", str(root / "frontend" / "docs")).strip(),
+        docs_dir=os.getenv("DOCS_DIR", str(root / "backend" / "data" / "toolkit_docs")).strip(),
         app_version=os.getenv("APP_VERSION", "0.1.0").strip(),
     )
 

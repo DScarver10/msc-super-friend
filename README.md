@@ -68,6 +68,9 @@ See `web/.env.example`.
 - Output: `.next` (managed by Vercel)
 - Required env vars:
   - `NEXT_PUBLIC_API_BASE_URL=https://<your-api>.onrender.com`
+  - `NEXT_PUBLIC_APP_VERSION=1.0.0`
+
+Note: Legacy Streamlit UI has been retired. The supported frontend is the Next.js app in `web/`.
 
 ### API on Render (`api/`)
 - Runtime: Python

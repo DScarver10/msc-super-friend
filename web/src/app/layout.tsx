@@ -29,6 +29,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const appVersion = (process.env.NEXT_PUBLIC_APP_VERSION || "").trim() || "1.0.0";
+
   return (
     <html lang="en">
       <body className="bg-msc-bg text-slate-900">
@@ -48,7 +50,7 @@ export default function RootLayout({
           </header>
           <main>{children}</main>
           <footer className="mt-8 border-t border-slate-300 pt-4 pb-2 text-center text-xs text-slate-500">
-            Built for MSCs | Version 1.0
+            {appVersion}
           </footer>
         </div>
         <BottomNav />

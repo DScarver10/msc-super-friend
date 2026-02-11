@@ -41,7 +41,7 @@ FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
 RETRIEVAL_TRACE_PATH = Path("backend/data/retrieval_traces.jsonl")
 RETRIEVAL_TRACE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-DOCS_DIR = Path(getattr(settings, "docs_dir", "")) if getattr(settings, "docs_dir", "") else Path(__file__).resolve().parents[1] / "frontend" / "docs"
+DOCS_DIR = Path(getattr(settings, "docs_dir", "")) if getattr(settings, "docs_dir", "") else Path(__file__).resolve().parents[1] / "backend" / "data" / "toolkit_docs"
 DOCS_DIR = DOCS_DIR.resolve()
 
 

@@ -109,7 +109,7 @@ export default function AskSuperFriendPage() {
             <rect x="4" y="5" width="16" height="12" rx="2" />
             <path d="M9 21h6M12 17v4M9 10h.01M15 10h.01M9 13c.8.7 1.8 1 3 1s2.2-.3 3-1" />
           </svg>
-          Ask me to find guidance, summarize references, or point you to the right AFI or DHA publication.
+          Ask a question and I’ll help you find guidance, summarize sources, and point you to relevant publications.
         </p>
       </div>
 

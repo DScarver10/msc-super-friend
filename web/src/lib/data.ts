@@ -177,11 +177,14 @@ function doctrineLinkInfo(rawHref: string | null | undefined): Pick<UiItem, "typ
   if (/^https?:\/\//i.test(href)) {
     const maybeName = path.basename(href.split("?")[0]).trim();
     if (maybeName && maybeName.toLowerCase().endsWith(".pdf")) {
-      return {
-        type: "local",
-        href: buildLocalDocUrl(maybeName),
-        filename: maybeName,
-      };
+      if (resolveLocalDocPath(maybeName)) {
+        return {
+          type: "local",
+          href: buildLocalDocUrl(maybeName),
+          filename: maybeName,
+        };
+      }
+      return { type: "external", href };
     }
     return { type: "external", href };
   }
@@ -189,16 +192,81 @@ function doctrineLinkInfo(rawHref: string | null | undefined): Pick<UiItem, "typ
   return toLinkInfo(href);
 }
 
-function apiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
+function buildLocalDocUrl(filename: string): string {
+  return `/docs/${encodeURIComponent(filename)}`;
 }
 
-function buildLocalDocUrl(filename: string): string {
-  const base = apiBaseUrl();
-  if (!base) {
-    return `/docs/${encodeURIComponent(filename)}`;
+function resolveLocalDocPath(filename: string): string | null {
+  const safe = path.basename(filename).trim();
+  if (!safe) {
+    return null;
   }
-  return `${base}/docs/${encodeURIComponent(filename)}`;
+  const candidates = [
+    path.resolve(process.cwd(), "public", "docs", safe),
+    path.resolve(process.cwd(), "web", "public", "docs", safe),
+    path.resolve(process.cwd(), "backend", "data", "toolkit_docs", safe),
+    path.resolve(process.cwd(), "..", "backend", "data", "toolkit_docs", safe),
+  ];
+  for (const candidate of candidates) {
+    if (pathExists(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function looksLikeDoctrineFilename(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return /^(afi|dafi|afman|dafman|jtr|dha)/.test(lower);
+}
+
+function getUnlistedDoctrineLocalItems(existingFilenames: Set<string>, startIdx: number): UiItem[] {
+  const dirs = [
+    path.resolve(process.cwd(), "public", "docs"),
+    path.resolve(process.cwd(), "web", "public", "docs"),
+    path.resolve(process.cwd(), "backend", "data", "toolkit_docs"),
+    path.resolve(process.cwd(), "..", "backend", "data", "toolkit_docs"),
+  ];
+  const seen = new Set<string>();
+  const items: UiItem[] = [];
+  let idx = startIdx;
+
+  for (const dir of dirs) {
+    if (!pathExists(dir)) {
+      continue;
+    }
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) {
+        continue;
+      }
+      const filename = entry.name;
+      const lower = filename.toLowerCase();
+      if (seen.has(lower) || existingFilenames.has(lower)) {
+        continue;
+      }
+      const ext = path.extname(lower);
+      if (!(ext === ".pdf" || ext === ".xlsx")) {
+        continue;
+      }
+      if (!looksLikeDoctrineFilename(filename)) {
+        continue;
+      }
+      seen.add(lower);
+      idx += 1;
+      items.push({
+        id: `doctrine-local-${idx}`,
+        title: toPublicationTitleCase(path.basename(filename, path.extname(filename)).replace(/[_-]+/g, " ")),
+        description: "",
+        tag: "Doctrine",
+        type: "local",
+        href: buildLocalDocUrl(filename),
+        filename,
+      });
+    }
+  }
+
+  return items;
 }
 
 function normalizeFallback(items: Array<Omit<UiItem, "filename"> & { filename?: string }>): UiItem[] {
@@ -314,7 +382,11 @@ export function getDoctrineItems(): UiItem[] {
       ];
     });
 
-    return items;
+    const existingFilenames = new Set<string>(
+      items.map((item) => (item.filename || "").toLowerCase()).filter((value) => Boolean(value)),
+    );
+    const extra = getUnlistedDoctrineLocalItems(existingFilenames, items.length);
+    return [...items, ...extra];
   } catch {
     return [];
   }
