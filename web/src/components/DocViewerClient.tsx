@@ -8,29 +8,19 @@ type DocViewerClientProps = {
   localUnavailable: boolean;
 };
 
-const PDFJS_VIEWER_URL = "https://mozilla.github.io/pdf.js/web/viewer.html";
-
-function buildPdfJsViewerUrl(fileUrl: string, search: string): string {
-  const base = `${PDFJS_VIEWER_URL}?file=${encodeURIComponent(fileUrl)}`;
+function buildNativeViewerUrl(fileUrl: string, search: string): string {
+  const base = fileUrl;
   const trimmed = search.trim();
   if (!trimmed) {
     return base;
   }
-  return `${base}#search=${encodeURIComponent(trimmed)}&phrase=true`;
+  return `${base}#search=${encodeURIComponent(trimmed)}`;
 }
 
 export function DocViewerClient({ filename, src, localUnavailable }: DocViewerClientProps) {
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
-
-  const fileUrl = useMemo(() => {
-    if (typeof window === "undefined") {
-      return src;
-    }
-    return `${window.location.origin}${src}`;
-  }, [src]);
-
-  const viewerUrl = useMemo(() => buildPdfJsViewerUrl(fileUrl, appliedQuery), [fileUrl, appliedQuery]);
+  const viewerUrl = useMemo(() => buildNativeViewerUrl(src, appliedQuery), [src, appliedQuery]);
 
   function runSearch(event: FormEvent) {
     event.preventDefault();
@@ -61,7 +51,7 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
           </button>
         </div>
         <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
-          This Find bar runs exact text search inside the PDF viewer. On mobile, you can also tap
+          This Find bar passes your search term to the viewer when supported. For most accurate word finding, tap
           <span className="font-semibold"> Open in new tab</span> and use browser find:
           Safari <span className="font-semibold">Share to Find on Page</span>, Chrome
           <span className="font-semibold"> menu to Find in page</span>.
