@@ -31,19 +31,14 @@ function resolveLocalDoc(filename: string): string | null {
 }
 
 function buildSourceUrl(filename: string): string {
-  const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
-  if (apiBase) {
-    return `${apiBase}/docs/${encodeURIComponent(filename)}`;
-  }
   return `/api/docs/${encodeURIComponent(filename)}`;
 }
 
 export default function DocsViewerPage({ params, searchParams }: DocsPageProps) {
   const filename = decodeURIComponent(params.filename);
   const src = buildSourceUrl(filename);
-  const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, "");
   const localDocPath = resolveLocalDoc(filename);
-  const localUnavailable = !apiBase && !localDocPath;
+  const localUnavailable = !localDocPath;
   const from = (searchParams?.from || "").toLowerCase();
   const backHref = from === "toolkit" ? "/msc-toolkit" : "/doctrine-library";
   const backLabel = from === "toolkit" ? "Back to toolkit" : "Back to library";

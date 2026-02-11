@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type SearchHit = {
   chunk_id: string;
@@ -51,6 +51,18 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
     }
     return buildViewerUrl(src, results[activeIndex].page, query);
   }, [activeIndex, query, results, src]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && key === "f") {
+        event.preventDefault();
+        window.open(src, "_blank", "noopener,noreferrer");
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [src]);
 
   async function runSearch(event: FormEvent) {
     event.preventDefault();
@@ -103,6 +115,14 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
           >
             {isSearching ? "Searching..." : "Search"}
           </button>
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Open Searchable PDF (Ctrl+F)
+          </a>
         </div>
         {searchError ? <p className="mt-2 text-sm text-red-700">{searchError}</p> : null}
         {query.trim() && !isSearching ? (
@@ -154,13 +174,15 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <iframe
-            title={`Viewer: ${filename}`}
-            src={viewerUrl}
-            className="h-[78vh] w-full border-0"
-            loading="lazy"
-            style={{ overflow: "auto", WebkitOverflowScrolling: "touch" }}
-          />
+          <object data={viewerUrl} type="application/pdf" className="h-[calc(100vh-15rem)] min-h-[560px] w-full">
+            <iframe
+              title={`Viewer: ${filename}`}
+              src={viewerUrl}
+              className="h-[calc(100vh-15rem)] min-h-[560px] w-full border-0"
+              loading="lazy"
+              style={{ overflow: "auto", WebkitOverflowScrolling: "touch" }}
+            />
+          </object>
         </div>
       )}
     </div>
