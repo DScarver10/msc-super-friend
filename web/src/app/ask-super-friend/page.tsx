@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 
 type Citation = {
   title: string;
@@ -19,38 +19,6 @@ type AskResponse = {
   answer: string;
   citations?: Citation[];
 };
-
-const QUICK_SUGGESTIONS = [
-  "What instruction governs medical materiel management in Air Force MTFs?",
-  "Who oversees TRICARE operations at the MTF level?",
-  "What policy governs telehealth credentialing?",
-  "What AFI governs manpower programming?",
-  "What instruction governs credentialing and privileging?",
-  "What AFI governs disaster response planning?",
-];
-
-function normalizeForMatch(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function buildSuggestions(query: string, corpus: string[], limit = 6): string[] {
-  const normalizedQuery = normalizeForMatch(query);
-  const deduped = Array.from(new Set(corpus.map((item) => item.trim()).filter(Boolean)));
-
-  if (!normalizedQuery) {
-    return deduped.slice(0, limit);
-  }
-
-  const startsWith = deduped.filter((item) => normalizeForMatch(item).startsWith(normalizedQuery));
-  const includes = deduped.filter((item) => {
-    const normalizedItem = normalizeForMatch(item);
-    return normalizedItem.includes(normalizedQuery) && !normalizedItem.startsWith(normalizedQuery);
-  });
-
-  return [...startsWith, ...includes]
-    .filter((item) => normalizeForMatch(item) !== normalizedQuery)
-    .slice(0, limit);
-}
 
 function getErrorMessage(status: number): string {
   if (status === 404) {
@@ -81,75 +49,12 @@ export default function AskSuperFriendPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>(QUICK_SUGGESTIONS);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const apiBaseUrl = useMemo(
     () => (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/$/, ""),
     [],
   );
-  const suggestionCorpus = useMemo(() => {
-    const userQuestions = messages.filter((message) => message.role === "user").map((message) => message.text);
-    const citationTitles = messages.flatMap((message) =>
-      (message.citations || []).map((citation) => citation.title).filter(Boolean),
-    );
-    return [...QUICK_SUGGESTIONS, ...userQuestions, ...citationTitles];
-  }, [messages]);
   const chatEnabled = Boolean(apiBaseUrl);
-
-  function refreshSuggestions(nextQuestion: string) {
-    const nextSuggestions = buildSuggestions(nextQuestion, suggestionCorpus);
-    setSuggestions(nextSuggestions);
-    setActiveSuggestionIndex(0);
-    setShowSuggestions(nextSuggestions.length > 0);
-  }
-
-  function applySuggestion(text: string) {
-    setQuestion(text);
-    setShowSuggestions(false);
-    setSuggestions(buildSuggestions(text, suggestionCorpus));
-    requestAnimationFrame(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        const end = text.length;
-        inputRef.current.setSelectionRange(end, end);
-      }
-    });
-  }
-
-  function handleInputKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (!showSuggestions || suggestions.length === 0) {
-      return;
-    }
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setActiveSuggestionIndex((prev) => (prev + 1) % suggestions.length);
-      return;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveSuggestionIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
-      return;
-    }
-
-    if (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey)) {
-      event.preventDefault();
-      const selected = suggestions[activeSuggestionIndex] || suggestions[0];
-      if (selected) {
-        applySuggestion(selected);
-      }
-      return;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setShowSuggestions(false);
-    }
-  }
 
   async function submitQuestion(rawQuestion: string) {
     const trimmed = rawQuestion.trim();
@@ -255,47 +160,13 @@ export default function AskSuperFriendPage() {
         </label>
         <textarea
           id="ask-input"
-          ref={inputRef}
           value={question}
-          onChange={(event) => {
-            const nextQuestion = event.target.value;
-            setQuestion(nextQuestion);
-            refreshSuggestions(nextQuestion);
-          }}
-          onFocus={() => refreshSuggestions(question)}
-          onKeyDown={handleInputKeyDown}
+          onChange={(event) => setQuestion(event.target.value)}
           placeholder="What is an MSC?"
           rows={4}
           disabled={isLoading || !chatEnabled}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-black placeholder:text-slate-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200 disabled:cursor-not-allowed disabled:bg-slate-100"
         />
-        {showSuggestions ? (
-          <div className="rounded-lg border border-slate-200 bg-white p-1.5">
-            <p className="px-2 pb-1 text-xs font-medium text-slate-500">Suggestions</p>
-            <ul className="max-h-44 space-y-1 overflow-auto">
-              {suggestions.map((suggestion, index) => {
-                const active = index === activeSuggestionIndex;
-                return (
-                  <li key={`${suggestion}-${index}`}>
-                    <button
-                      type="button"
-                      onPointerDown={(event) => {
-                        event.preventDefault();
-                        applySuggestion(suggestion);
-                      }}
-                      className={`w-full rounded-md px-3 py-2 text-left text-sm leading-snug text-slate-800 transition active:scale-[0.99] ${
-                        active ? "bg-[#f8eef1]" : "hover:bg-slate-50"
-                      }`}
-                    >
-                      {suggestion}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="px-2 pt-1 text-xs text-slate-500">Tap to fill. Use Up/Down then Enter to select.</p>
-          </div>
-        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="submit"

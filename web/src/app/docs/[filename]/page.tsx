@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import Link from "next/link";
+import { DocViewerClient } from "@/components/DocViewerClient";
 
 type DocsPageProps = {
   params: {
@@ -70,16 +71,7 @@ export default function DocsViewerPage({ params }: DocsPageProps) {
           </Link>
         </div>
       </header>
-
-      {localUnavailable ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          This document is unavailable in the local docs bundle. Use the controls above to retry or open an external source.
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <iframe title={`Viewer: ${filename}`} src={src} className="h-[75vh] w-full" loading="lazy" />
-        </div>
-      )}
+      <DocViewerClient filename={filename} src={src} localUnavailable={localUnavailable} />
     </section>
   );
 }

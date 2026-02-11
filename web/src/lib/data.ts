@@ -32,6 +32,7 @@ const ACRONYMS = [
   "TOPA",
   "TRICARE",
   "RMO",
+  "PI",
   "MEPRS",
   "MEPERS",
 ];
@@ -221,6 +222,7 @@ function looksLikeDoctrineFilename(filename: string): boolean {
 }
 
 function getUnlistedDoctrineLocalItems(existingFilenames: Set<string>, startIdx: number): UiItem[] {
+  const excludedDoctrineFiles = new Set<string>(["afman41-210_59mdwsup.pdf", "dha network structure.pdf"]);
   const dirs = [
     path.resolve(process.cwd(), "public", "docs"),
     path.resolve(process.cwd(), "web", "public", "docs"),
@@ -243,6 +245,9 @@ function getUnlistedDoctrineLocalItems(existingFilenames: Set<string>, startIdx:
       const filename = entry.name;
       const lower = filename.toLowerCase();
       if (seen.has(lower) || existingFilenames.has(lower)) {
+        continue;
+      }
+      if (excludedDoctrineFiles.has(lower)) {
         continue;
       }
       const ext = path.extname(lower);
@@ -361,8 +366,19 @@ export function getDoctrineItems(): UiItem[] {
       const title = toPublicationTitleCase(row.title);
       const tag = toSentenceCase(row.msc_functional_area) || "Doctrine";
       const linkInfo = doctrineLinkInfo(row.official_publication_pdf);
+      const titleNormalized = `${pub} ${title}`.toLowerCase();
+      const hrefNormalized = cleanText(row.official_publication_pdf).toLowerCase();
 
       if (!linkInfo) {
+        return [];
+      }
+      if (titleNormalized.includes("jtr frequently asked questions")) {
+        return [];
+      }
+      if (hrefNormalized.includes("frequently-asked-questions")) {
+        return [];
+      }
+      if (hrefNormalized.includes("afman41-210_59mdwsup")) {
         return [];
       }
 

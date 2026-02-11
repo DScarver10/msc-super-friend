@@ -119,8 +119,8 @@ export function ResourceLibrary({
       </div>
 
       <div className="sticky top-2 z-10 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-        <label htmlFor={inputId} className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-          Find (Ctrl+F)
+        <label htmlFor={inputId} className="sr-only">
+          Search resources
         </label>
         <div className="flex items-center gap-2">
           <input

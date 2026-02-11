@@ -87,9 +87,6 @@ export function CardList({ items, emptyMessage = "No items yet.", highlightTerm 
                       <HighlightedText text={item.description} term={highlightTerm} />
                     </p>
                   ) : null}
-                  <p className={`mt-2 text-[11px] font-semibold uppercase tracking-wide ${descClass}`}>
-                    {item.type === "external" ? "Open external source" : "Open in-app viewer"}
-                  </p>
                 </div>
               </div>
             );

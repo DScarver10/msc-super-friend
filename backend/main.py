@@ -17,8 +17,52 @@ from starlette.responses import FileResponse
 from backend.config import load_settings
 from backend.logging_setup import setup_logging
 from backend.rag.ingest import ingest
-from backend.rag.retrieve import retrieve_with_trace
 from backend.rag.llm import generate_grounded_answer  # your existing function
+
+try:
+    from backend.rag.retrieve import retrieve_with_trace
+except ImportError:
+    # Backward compatibility for environments that still expose only `retrieve`.
+    from backend.rag.retrieve import retrieve as _retrieve_only
+
+    class _FallbackTrace:
+        def __init__(self, question: str, top_k: int) -> None:
+            self._question = question
+            self._top_k = top_k
+
+        def to_dict(self) -> dict:
+            return {
+                "query": self._question,
+                "normalized_query": self._question,
+                "routed_domain": "unknown",
+                "top_k": self._top_k,
+                "candidate_count": 0,
+                "vector_weight": None,
+                "lexical_weight": None,
+                "rerank_mode": "compat_fallback",
+                "selected": [],
+            }
+
+    def retrieve_with_trace(
+        index_dir: Path,
+        question: str,
+        top_k: int = 5,
+        allowed_sources: Optional[List[str]] = None,
+        api_key: str | None = None,
+        embedding_model: str = "text-embedding-3-small",
+        vector_weight: float = 0.75,
+        lexical_weight: float = 0.25,
+        rerank_mode: str = "heuristic",
+    ):
+        evidence = _retrieve_only(
+            index_dir=index_dir,
+            question=question,
+            top_k=top_k,
+            allowed_sources=allowed_sources,
+            api_key=api_key,
+            embedding_model=embedding_model,
+        )
+        return evidence, _FallbackTrace(question=question, top_k=top_k)
 
 setup_logging()
 logger = logging.getLogger("backend")
