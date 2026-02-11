@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { BottomNav } from "@/components/BottomNav";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import "./globals.css";
@@ -38,14 +39,16 @@ export default function RootLayout({
         <div className="mx-auto min-h-screen max-w-5xl px-4 py-4 pb-24 sm:px-6 sm:pb-6">
           <header className="mb-4 rounded-xl border border-slate-200 bg-[linear-gradient(135deg,_#ffffff,_#f8fafc)] p-4 shadow-sm">
             <div className="flex items-center">
-              <Image
-                src="/msc.png"
-                alt="MSC Super Companion"
-                width={640}
-                height={140}
-                priority
-                className="h-auto w-full max-w-[340px] rounded-md sm:max-w-[420px]"
-              />
+              <Link href="/" aria-label="Go to homepage" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-md">
+                <Image
+                  src="/msc.png"
+                  alt="MSC Super Companion"
+                  width={640}
+                  height={140}
+                  priority
+                  className="h-auto w-full max-w-[340px] rounded-md sm:max-w-[420px]"
+                />
+              </Link>
             </div>
           </header>
           <main>{children}</main>

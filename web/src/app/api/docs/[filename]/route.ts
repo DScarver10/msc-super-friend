@@ -20,7 +20,7 @@ function safeFilename(value: string): string | null {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: { filename: string } },
 ) {
   const filename = safeFilename(decodeURIComponent(context.params.filename));
@@ -39,10 +39,14 @@ export async function GET(
     try {
       const file = await fs.readFile(candidate);
       const ext = path.extname(filename).toLowerCase();
+      const forceDownload = (request.nextUrl.searchParams.get("download") || "").trim() === "1";
+      const disposition = forceDownload ? "attachment" : "inline";
       return new NextResponse(file, {
         status: 200,
         headers: {
           "Content-Type": CONTENT_TYPE_BY_EXT[ext] || "application/octet-stream",
+          "Content-Disposition": `${disposition}; filename="${filename}"`,
+          "Access-Control-Allow-Origin": "*",
           "Cache-Control": "public, max-age=3600",
         },
       });

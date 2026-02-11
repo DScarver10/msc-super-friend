@@ -1,21 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-
-type SearchHit = {
-  chunk_id: string;
-  title: string;
-  snippet: string;
-  page: number | null;
-  section: string | null;
-  subsection: string | null;
-};
-
-type SearchResponse = {
-  query: string;
-  count: number;
-  results: SearchHit[];
-};
+import { FormEvent, useMemo, useState } from "react";
 
 type DocViewerClientProps = {
   filename: string;
@@ -23,74 +8,33 @@ type DocViewerClientProps = {
   localUnavailable: boolean;
 };
 
-function buildViewerUrl(base: string, page: number | null, query: string): string {
-  const parts: string[] = [];
-  if (page !== null && Number.isFinite(page)) {
-    parts.push(`page=${page}`);
-  }
-  if (query.trim()) {
-    parts.push(`search=${encodeURIComponent(query.trim())}`);
-  }
-  if (parts.length === 0) {
+const PDFJS_VIEWER_URL = "https://mozilla.github.io/pdf.js/web/viewer.html";
+
+function buildPdfJsViewerUrl(fileUrl: string, search: string): string {
+  const base = `${PDFJS_VIEWER_URL}?file=${encodeURIComponent(fileUrl)}`;
+  const trimmed = search.trim();
+  if (!trimmed) {
     return base;
   }
-  return `${base}#${parts.join("&")}`;
+  return `${base}#search=${encodeURIComponent(trimmed)}&phrase=true`;
 }
 
 export function DocViewerClient({ filename, src, localUnavailable }: DocViewerClientProps) {
   const [query, setQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [results, setResults] = useState<SearchHit[]>([]);
-  const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [appliedQuery, setAppliedQuery] = useState("");
 
-  const viewerUrl = useMemo(() => {
-    if (activeIndex < 0 || activeIndex >= results.length) {
-      // Keep default viewer state at full document (no forced page jump).
+  const fileUrl = useMemo(() => {
+    if (typeof window === "undefined") {
       return src;
     }
-    return buildViewerUrl(src, results[activeIndex].page, query);
-  }, [activeIndex, query, results, src]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase();
-      if ((event.ctrlKey || event.metaKey) && key === "f") {
-        event.preventDefault();
-        window.open(src, "_blank", "noopener,noreferrer");
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return `${window.location.origin}${src}`;
   }, [src]);
 
-  async function runSearch(event: FormEvent) {
-    event.preventDefault();
-    const trimmed = query.trim();
-    setSearchError(null);
-    setResults([]);
-    setActiveIndex(-1);
-    if (!trimmed) {
-      return;
-    }
+  const viewerUrl = useMemo(() => buildPdfJsViewerUrl(fileUrl, appliedQuery), [fileUrl, appliedQuery]);
 
-    setIsSearching(true);
-    try {
-      const response = await fetch(`/api/docs/${encodeURIComponent(filename)}/search?q=${encodeURIComponent(trimmed)}`);
-      if (!response.ok) {
-        throw new Error("Unable to search this document.");
-      }
-      const payload = (await response.json()) as SearchResponse;
-      const hits = Array.isArray(payload.results) ? payload.results : [];
-      setResults(hits);
-      // Do not auto-jump; let the user choose a specific hit.
-      setActiveIndex(-1);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Search unavailable.";
-      setSearchError(message);
-    } finally {
-      setIsSearching(false);
-    }
+  function runSearch(event: FormEvent) {
+    event.preventDefault();
+    setAppliedQuery(query.trim());
   }
 
   return (
@@ -110,63 +54,24 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
           />
           <button
             type="submit"
-            disabled={isSearching || !query.trim()}
+            disabled={!query.trim()}
             className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500"
           >
-            {isSearching ? "Searching..." : "Search"}
+            Find
           </button>
-          <a
-            href={src}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-          >
-            Open Searchable PDF (Ctrl+F)
-          </a>
         </div>
-        {searchError ? <p className="mt-2 text-sm text-red-700">{searchError}</p> : null}
-        {query.trim() && !isSearching ? (
+        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
+          This Find bar runs exact text search inside the PDF viewer. On mobile, you can also tap
+          <span className="font-semibold"> Open in new tab</span> and use browser find:
+          Safari <span className="font-semibold">Share to Find on Page</span>, Chrome
+          <span className="font-semibold"> menu to Find in page</span>.
+        </div>
+        {appliedQuery ? (
           <p className="mt-2 text-xs text-slate-500">
-            {results.length > 0
-              ? `Found ${results.length} matches. Select a result to jump to the closest page in the viewer.`
-              : "No exact matches found in indexed chunks for this document."}
+            Applied find term: <span className="font-semibold">{appliedQuery}</span>
           </p>
         ) : null}
       </form>
-
-      {results.length > 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <ul className="max-h-64 space-y-2 overflow-auto">
-            {results.map((hit, index) => {
-              const locator = [
-                hit.page !== null ? `p.${hit.page}` : null,
-                hit.section ? `section ${hit.section}` : null,
-                hit.subsection ? `subsection ${hit.subsection}` : null,
-              ]
-                .filter(Boolean)
-                .join(" | ");
-              const active = index === activeIndex;
-              return (
-                <li key={hit.chunk_id}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveIndex(index)}
-                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
-                      active
-                        ? "border-amber-300 bg-amber-50 text-slate-900"
-                        : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
-                    }`}
-                  >
-                    <p className="font-semibold">{hit.title}</p>
-                    {locator ? <p className="mt-0.5 text-xs text-slate-500">{locator}</p> : null}
-                    <p className="mt-1 text-xs text-slate-700">{hit.snippet}</p>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
 
       {localUnavailable ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -174,15 +79,13 @@ export function DocViewerClient({ filename, src, localUnavailable }: DocViewerCl
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <object data={viewerUrl} type="application/pdf" className="h-[calc(100vh-15rem)] min-h-[560px] w-full">
-            <iframe
-              title={`Viewer: ${filename}`}
-              src={viewerUrl}
-              className="h-[calc(100vh-15rem)] min-h-[560px] w-full border-0"
-              loading="lazy"
-              style={{ overflow: "auto", WebkitOverflowScrolling: "touch" }}
-            />
-          </object>
+          <iframe
+            title={`Viewer: ${filename}`}
+            src={viewerUrl}
+            className="h-[calc(100vh-15rem)] min-h-[560px] w-full border-0"
+            loading="lazy"
+            style={{ overflow: "auto", WebkitOverflowScrolling: "touch" }}
+          />
         </div>
       )}
     </div>

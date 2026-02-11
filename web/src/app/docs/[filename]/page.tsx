@@ -34,9 +34,14 @@ function buildSourceUrl(filename: string): string {
   return `/api/docs/${encodeURIComponent(filename)}`;
 }
 
+function buildDownloadUrl(filename: string): string {
+  return `/api/docs/${encodeURIComponent(filename)}?download=1`;
+}
+
 export default function DocsViewerPage({ params, searchParams }: DocsPageProps) {
   const filename = decodeURIComponent(params.filename);
   const src = buildSourceUrl(filename);
+  const downloadUrl = buildDownloadUrl(filename);
   const localDocPath = resolveLocalDoc(filename);
   const localUnavailable = !localDocPath;
   const from = (searchParams?.from || "").toLowerCase();
@@ -58,7 +63,7 @@ export default function DocsViewerPage({ params, searchParams }: DocsPageProps) 
             Open in new tab
           </a>
           <a
-            href={src}
+            href={downloadUrl}
             download={filename}
             className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
           >
