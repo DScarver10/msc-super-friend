@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Image from "next/image";
 import { BottomNav } from "@/components/BottomNav";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
@@ -6,11 +6,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "MSC Super Friend",
-    template: "%s | MSC Super Friend",
+    default: "MSC Super Companion",
+    template: "%s | MSC Super Companion",
   },
-  description: "Next.js frontend for MSC Super Friend",
-  themeColor: "#0b3c5d",
+  description: "Next.js frontend for MSC Super Companion",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -19,6 +18,10 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/icons/icon-192.png" }],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b3c5d",
 };
 
 export default function RootLayout({
@@ -31,11 +34,11 @@ export default function RootLayout({
       <body className="bg-msc-bg text-slate-900">
         <ServiceWorkerRegister />
         <div className="mx-auto min-h-screen max-w-5xl px-4 py-4 pb-24 sm:px-6 sm:pb-6">
-          <header className="mb-4 rounded-xl border border-slate-200 bg-msc-card p-4 shadow-sm">
+          <header className="mb-4 rounded-xl border border-slate-200 bg-[linear-gradient(135deg,_#ffffff,_#f8fafc)] p-4 shadow-sm">
             <div className="flex items-center">
               <Image
                 src="/msc.png"
-                alt="MSC Super Friend"
+                alt="MSC Super Companion"
                 width={640}
                 height={140}
                 priority

@@ -53,8 +53,8 @@ export default function SettingsPage() {
   async function handleShare() {
     const url = typeof window !== "undefined" ? window.location.origin : "";
     const shareData = {
-      title: "MSC Super Friend",
-      text: "MSC Super Friend",
+      title: "MSC Super Companion",
+      text: "MSC Super Companion",
       url,
     };
 

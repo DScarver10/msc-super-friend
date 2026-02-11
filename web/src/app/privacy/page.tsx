@@ -19,7 +19,7 @@ export default function PrivacyPage() {
       <section className="space-y-2 text-sm leading-6 text-slate-700">
         <h3 className="text-base font-semibold text-slate-900">Scope</h3>
         <p>
-          MSC Super Friend is a reference assistant for policy and guidance navigation. It is designed for public-source
+          MSC Super Companion is a reference assistant for policy and guidance navigation. It is designed for public-source
           content only.
         </p>
       </section>

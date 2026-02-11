@@ -14,7 +14,7 @@ export default function AboutPage() {
       <header className="space-y-2">
         <h2 className="text-xl font-semibold text-msc-navy">About</h2>
         <p className="text-sm leading-6 text-slate-700">
-          MSC Super Friend - Your trusted friend for navigating policy, guidance, and everyday tools.
+          MSC Super Companion - Your trusted friend for navigating policy, guidance, and everyday tools.
         </p>
       </header>
 

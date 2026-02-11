@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import time
+from uuid import uuid4
 from pathlib import Path
 from typing import List, Optional
 
@@ -14,14 +17,14 @@ from starlette.responses import FileResponse
 from backend.config import load_settings
 from backend.logging_setup import setup_logging
 from backend.rag.ingest import ingest
-from backend.rag.retrieve import retrieve
+from backend.rag.retrieve import retrieve_with_trace
 from backend.rag.llm import generate_grounded_answer  # your existing function
 
 setup_logging()
 logger = logging.getLogger("backend")
 
 settings = load_settings()
-app = FastAPI(title="MSC Super Friend Backend", version=getattr(settings, "app_version", "0.1.0"))
+app = FastAPI(title="MSC Super Companion Backend", version=getattr(settings, "app_version", "0.1.0"))
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,6 +38,8 @@ INDEX_STATE = {"indexed_as_of": "not indexed", "num_chunks": 0, "sources": []}
 
 FEEDBACK_PATH = Path("backend/data/feedback.jsonl")
 FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
+RETRIEVAL_TRACE_PATH = Path("backend/data/retrieval_traces.jsonl")
+RETRIEVAL_TRACE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 DOCS_DIR = Path(getattr(settings, "docs_dir", "")) if getattr(settings, "docs_dir", "") else Path(__file__).resolve().parents[1] / "frontend" / "docs"
 DOCS_DIR = DOCS_DIR.resolve()
@@ -114,6 +119,29 @@ class AskResponse(BaseModel):
     citations: List[Citation]
     question_id: str
     answer_id: str
+    grounded: bool = False
+    indexed_as_of: str = "unknown"
+    retrieval_trace_id: str | None = None
+
+
+def _answer_has_citation_markers(answer: str) -> bool:
+    return bool(re.search(r"\[E\d+\]", answer or ""))
+
+
+def _is_grounded(evidence: list[Citation], answer: str, min_top_score: float) -> bool:
+    if not evidence:
+        return False
+    if max((c.score for c in evidence), default=0.0) < min_top_score:
+        return False
+    return _answer_has_citation_markers(answer)
+
+
+def _write_retrieval_trace(payload: dict) -> str:
+    trace_id = payload.get("trace_id") or str(uuid4())
+    payload["trace_id"] = trace_id
+    with RETRIEVAL_TRACE_PATH.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    return trace_id
 
 
 @app.get("/")
@@ -196,23 +224,34 @@ def ask(req: AskRequest):
         if not api_key:
             raise HTTPException(status_code=500, detail="Missing OPENAI_API_KEY on backend.")
 
-        evidence = retrieve(
+        vector_weight = float(os.getenv("RAG_VECTOR_WEIGHT", "0.75"))
+        lexical_weight = float(os.getenv("RAG_LEXICAL_WEIGHT", "0.25"))
+        rerank_mode = os.getenv("RAG_RERANK_MODE", "heuristic").strip().lower() or "heuristic"
+        min_top_score = float(os.getenv("RAG_MIN_TOP_SCORE", "0.2"))
+
+        evidence, retrieval_trace = retrieve_with_trace(
             index_dir=index_dir,
             question=req.question,
             top_k=req.top_k,
             allowed_sources=req.allowed_sources,
             api_key=api_key,
             embedding_model=getattr(settings, "embedding_model", "text-embedding-3-small"),
+            vector_weight=vector_weight,
+            lexical_weight=lexical_weight,
+            rerank_mode=rerank_mode,
         )
 
         # Build an evidence pack for the LLM (IDs E1..)
         # Your generate_grounded_answer already expects a list of Evidence with evid_id + excerpt.
-        answer_text = generate_grounded_answer(
-            api_key=api_key,
-            model=getattr(settings, "llm_model", "gpt-4o-mini"),
-            question=req.question,
-            evidence=evidence,
-        )
+        if evidence:
+            answer_text = generate_grounded_answer(
+                api_key=api_key,
+                model=getattr(settings, "llm_model", "gpt-4o-mini"),
+                question=req.question,
+                evidence=evidence,
+            )
+        else:
+            answer_text = "Insufficient evidence in the indexed sources."
 
         ts = int(time.time())
         qid = f"q_{ts}"
@@ -230,6 +269,31 @@ def ask(req: AskRequest):
             )
             for e in evidence
         ]
+        grounded = _is_grounded(citations, answer_text, min_top_score=min_top_score)
+        if not grounded:
+            answer_text = "Insufficient evidence in the indexed sources."
+
+        trace_id: str | None = None
+        try:
+            trace_payload = {
+                "ts": int(time.time()),
+                "question": req.question,
+                "top_k": req.top_k,
+                "allowed_sources": req.allowed_sources or [],
+                "retrieval": retrieval_trace.to_dict(),
+                "grounded": grounded,
+                "citation_count": len(citations),
+                "top_score": max((c.score for c in citations), default=0.0),
+            }
+            trace_id = _write_retrieval_trace(trace_payload)
+            logger.info(
+                "retrieval_trace_id=%s grounded=%s citations=%s",
+                trace_id,
+                grounded,
+                len(citations),
+            )
+        except Exception:
+            logger.exception("Failed to persist retrieval trace")
 
         return AskResponse(
             question=req.question,
@@ -237,6 +301,9 @@ def ask(req: AskRequest):
             citations=citations,
             question_id=qid,
             answer_id=aid,
+            grounded=grounded,
+            indexed_as_of=INDEX_STATE["indexed_as_of"],
+            retrieval_trace_id=trace_id,
         )
 
     except HTTPException:

@@ -33,7 +33,7 @@ def generate_grounded_answer(
     client = OpenAI(api_key=api_key)
 
     system = (
-        "You are MSC Super Friend, an evidence-based assistant for Air Force Medical Service Corps officers.\n"
+        "You are MSC Super Companion, an evidence-based assistant for Air Force Medical Service Corps officers.\n"
         "You MUST follow these rules:\n"
         "1) Use ONLY the provided evidence excerpts. Do not use outside knowledge.\n"
         "2) If the evidence is insufficient or conflicting, say: 'Insufficient evidence in the indexed sources.'\n"

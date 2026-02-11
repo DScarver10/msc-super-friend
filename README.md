@@ -1,6 +1,6 @@
-﻿# MSC Super Friend
+# MSC Super Companion
 
-MSC Super Friend is an evidence-based reference and retrieval tool for Medical Service Corps officers.
+MSC Super Companion is an evidence-based reference and retrieval tool for Medical Service Corps officers.
 
 ## Architecture
 - Legacy backend (RAG + ingestion): `backend/`
@@ -33,6 +33,10 @@ If PowerShell blocks `npm.ps1` with `PSSecurityException`, use either:
 - `DOCS_DIR` (optional, default `backend/data/toolkit_docs`)
 - `LLM_MODEL` (optional, default `gpt-4o-mini`)
 - `EMBEDDING_MODEL` (optional, default `text-embedding-3-small`)
+- `RAG_VECTOR_WEIGHT` (optional, default `0.75`)
+- `RAG_LEXICAL_WEIGHT` (optional, default `0.25`)
+- `RAG_RERANK_MODE` (optional, default `heuristic`; use `none` to disable rerank)
+- `RAG_MIN_TOP_SCORE` (optional, default `0.2`; groundedness threshold)
 
 See `api/.env.example`.
 
@@ -53,6 +57,8 @@ See `web/.env.example`.
   - `python scripts/build_index.py`
 - API smoke test (`POST /ask`):
   - `python scripts/smoke_test_api.py`
+- Retrieval regression harness:
+  - `python scripts/rag_regression.py --index-dir backend/data/index --cases scripts/rag_regression_cases.json`
 
 ## Deploy
 ### Web on Vercel (`web/`)

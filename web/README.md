@@ -1,4 +1,4 @@
-# MSC Super Friend Web (Next.js)
+# MSC Super Companion Web (Next.js)
 
 ## Run locally
 

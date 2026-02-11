@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MSC Super Friend",
+    name: "MSC Super Companion",
     short_name: "MSC Friend",
-    description: "Mobile-first interface for doctrine, toolkit resources, and Ask Super Friend.",
+    description: "Mobile-first interface for doctrine, toolkit resources, and Ask Super Companion.",
     start_url: "/",
     display: "standalone",
     background_color: "#f2f4f6",

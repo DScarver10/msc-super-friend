@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import html
+import hashlib
 import json
 import re
 from base64 import b64encode
@@ -22,18 +23,25 @@ STYLES_DIR = APP_ROOT / "styles"
 
 MSC_BADGE_PATH = ASSETS_DIR / "msc.png"
 BOT_ICON_PATH = ASSETS_DIR / "bot.png"
-SEED_CSV_PATH = APP_ROOT / "content" / "afi41_seed.csv"
+REPO_ROOT = APP_ROOT.parent
+SEED_CSV_PATH = (
+    REPO_ROOT / "web" / "public" / "data" / "afi41_seed.csv"
+    if (REPO_ROOT / "web" / "public" / "data" / "afi41_seed.csv").exists()
+    else APP_ROOT / "content" / "afi41_seed.csv"
+)
 
 AFMS_MSC_URL = "https://www.airforcemedicine.af.mil/About-Us/Medical-Branches/Medical-Service-Corps/"
 BACKEND_URL = st.secrets.get("BACKEND_URL", "http://127.0.0.1:8000")
 BACKEND_URL_CONFIGURED = "BACKEND_URL" in st.secrets
+APP_VERSION = str(st.secrets.get("APP_VERSION", "1.0.0"))
+SVG_FEEDBACK_DEFAULT = bool(st.secrets.get("SVG_FEEDBACK_DEFAULT", False))
 
 # ----------------------------
 # Streamlit page config
 # ----------------------------
 st.set_page_config(
-    page_title="MSC Super Friend",
-    page_icon=str(MSC_BADGE_PATH) if MSC_BADGE_PATH.exists() else "📘",
+    page_title="MSC Super Companion",
+    page_icon=str(MSC_BADGE_PATH) if MSC_BADGE_PATH.exists() else "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¹Ã…â€œ",
     layout="wide",
 )
 
@@ -241,6 +249,17 @@ st.markdown(
       .sf-chat-wrap [data-testid="stButton"]{
         margin-top: 6px;
       }
+      .sf-svg-thumb {
+        width: 22px;
+        height: 22px;
+        margin: 0 auto 4px auto;
+        color: #1B3F72;
+      }
+      .sf-svg-thumb svg {
+        width: 22px;
+        height: 22px;
+        display: block;
+      }
     </style>
     """,
     unsafe_allow_html=True,
@@ -288,6 +307,182 @@ def load_afi_seed() -> list[dict]:
             }
         )
     return items
+
+
+@st.cache_data(show_spinner=False)
+def load_index_meta_rows() -> list[dict]:
+    meta_path = REPO_ROOT / "backend" / "data" / "index" / "meta.json"
+    if not meta_path.exists():
+        return []
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _normalize_doc_ref(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    lower = raw.lower()
+    if lower.startswith("http://") or lower.startswith("https://"):
+        return lower
+    return Path(raw.replace("\\", "/")).name.lower()
+
+
+def _chunk_belongs_to_doc(chunk: dict, doc_ref: str) -> bool:
+    if not doc_ref:
+        return False
+    chunk_url = (chunk.get("url") or "").strip().lower()
+    chunk_path = (chunk.get("local_path") or "").strip().replace("\\", "/")
+    chunk_name = Path(chunk_path).name.lower() if chunk_path else ""
+    if doc_ref.startswith("http://") or doc_ref.startswith("https://"):
+        return doc_ref == chunk_url or doc_ref in chunk_url
+    return doc_ref == chunk_name
+
+
+def _make_match_snippet(text: str, terms: list[str], window: int = 180) -> str:
+    cleaned = clean_text(text)
+    if not cleaned:
+        return ""
+    lower = cleaned.lower()
+    positions = [lower.find(t) for t in terms if t and lower.find(t) >= 0]
+    anchor = min(positions) if positions else 0
+    start = max(0, anchor - window)
+    end = min(len(cleaned), anchor + window)
+    snippet = cleaned[start:end].strip()
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(cleaned):
+        snippet = snippet + "..."
+    return snippet
+
+
+def search_indexed_doc_content(doc_ref: str, query: str, max_hits: int = 6) -> list[dict]:
+    terms = [t for t in re.findall(r"[a-z0-9][a-z0-9\-]+", (query or "").lower()) if len(t) >= 2]
+    if not doc_ref or not terms:
+        return []
+
+    rows = load_index_meta_rows()
+    ranked: list[tuple[int, dict]] = []
+    for row in rows:
+        if not _chunk_belongs_to_doc(row, doc_ref):
+            continue
+        text = row.get("text") or ""
+        lower = text.lower()
+        if not all(t in lower for t in terms):
+            continue
+        score = sum(lower.count(t) for t in terms)
+        ranked.append((score, row))
+
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    hits: list[dict] = []
+    for score, row in ranked[:max_hits]:
+        hits.append(
+            {
+                "score": score,
+                "page": row.get("page"),
+                "snippet": _make_match_snippet(row.get("text") or "", terms),
+            }
+        )
+    return hits
+
+
+def _to_viewer_page(page_value: object) -> int | None:
+    try:
+        raw = int(page_value)  # type: ignore[arg-type]
+    except Exception:
+        return None
+    # Most PDF viewers are 1-based. If index data is 0-based, bump it.
+    return raw + 1 if raw >= 0 else None
+
+
+def _build_pdf_match_url(base_url: str, search_query: str, page_value: object) -> str:
+    if not base_url:
+        return ""
+    root = base_url.split("#", 1)[0]
+    parts: list[str] = []
+    page = _to_viewer_page(page_value)
+    if page is not None:
+        parts.append(f"page={page}")
+    if search_query.strip():
+        parts.append(f"search={quote(search_query.strip())}")
+    if not parts:
+        return root
+    return f"{root}#{'&'.join(parts)}"
+
+
+def render_doc_find_panel(items: list[dict], panel_key: str) -> None:
+    options: list[dict] = []
+    seen: set[str] = set()
+    for item in items:
+        title = to_sentence_case(item.get("title") or "").strip() or "Untitled"
+        pub = clean_text(item.get("pub") or "")
+        label = f"{pub} - {title}" if pub else title
+        links = item.get("official_links", []) or []
+        if not links:
+            continue
+        raw_ref = (links[0].get("url") or "").strip()
+        norm_ref = _normalize_doc_ref(raw_ref)
+        if not norm_ref or norm_ref in seen:
+            continue
+        seen.add(norm_ref)
+        options.append(
+            {
+                "label": label,
+                "doc_ref": norm_ref,
+                "open_url": build_doc_url(item),
+            }
+        )
+
+    if not options:
+        return
+
+    st.markdown("#### Find In A Document")
+    st.caption("Mobile-friendly in-document search over indexed text snippets.")
+
+    doc_idx = st.selectbox(
+        "Document",
+        options=list(range(len(options))),
+        format_func=lambda i: str(options[i].get("label") or ""),
+        key=f"{panel_key}_doc_idx",
+    )
+    selected = options[doc_idx]
+    selected_label = str(selected.get("label") or "")
+    selected_ref = str(selected.get("doc_ref") or "")
+    selected_open_url = str(selected.get("open_url") or "")
+
+    query = st.text_input(
+        "Find text",
+        placeholder="Type a word or phrase to search within the selected document...",
+        key=f"{panel_key}_query",
+    )
+    if not query.strip():
+        return
+
+    hits = search_indexed_doc_content(selected_ref, query.strip(), max_hits=6)
+    if not hits:
+        st.caption("No matches found in indexed content for this document.")
+        return
+
+    st.markdown(f"**Matches in:** {selected_label}")
+    for i, hit in enumerate(hits, start=1):
+        page = hit.get("page")
+        page_num = _to_viewer_page(page)
+        page_text = f"Page {page_num}" if page_num is not None else "Page not available"
+        snippet = hit.get("snippet") or ""
+        st.markdown(f"**{i}. {page_text}**")
+        st.caption(snippet)
+
+        open_url = _build_pdf_match_url(selected_open_url, query.strip(), page)
+        if open_url:
+            st.link_button(
+                f"Open at match {i}",
+                open_url,
+                use_container_width=True,
+                key=f"{panel_key}_open_{doc_idx}_{i}",
+            )
 
 
 def _data_uri(path: Path) -> str:
@@ -356,19 +551,19 @@ def render_app_header():
         """,
         unsafe_allow_html=True,
     )
-    st.caption("Public sources only. Do not enter PHI/PII.")
+    st.caption("For official-use research support only. Do not enter PHI, PII, or operationally sensitive data.")
 
 
 def render_welcome_panel():
-    icon = f"<img src='{BOT_ICON_URI}' alt='Bot'/>" if BOT_ICON_URI else "🤖"
+    icon = f"<img src='{BOT_ICON_URI}' alt='Bot'/>" if BOT_ICON_URI else "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“"
     st.markdown(
         f"""
         <div class="sf-welcome">
           <div class="sf-avatar">{icon}</div>
           <div>
-            <h3>Hi! I’m MSC Super Friend.</h3>
-            <p>Ask me to find guidance, summarize references, or point you to the right AFI or DHA publication.</p>
-            <div class="muted">Public sources only. Do not enter PHI/PII.</div>
+            <h3>Welcome to MSC Super Companion.</h3>
+            <p>Ask a question and I’ll help you find guidance, summarize sources, and point you to relevant publications.</p>
+            <div class="muted">Citations are provided when supporting evidence is retrieved. Validate decisions against official publications and local command policy.</div>
           </div>
         </div>
         """,
@@ -377,7 +572,7 @@ def render_welcome_panel():
 
 
 def render_links_as_buttons(links: list[dict]):
-    # Cleaner than raw markdown link list, still “trust-first”
+    # Cleaner than raw markdown link list, still ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“trust-firstÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â
     if not links:
         st.caption("Official links: none")
         return
@@ -582,18 +777,50 @@ def to_sentence_case(text: str) -> str:
 
 
 def make_open_token(kind: str, idx: int) -> str:
-    # stable enough within this run; we’ll re-map each rerun from JSON
+    # stable enough within this run; weÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll re-map each rerun from JSON
     return f"{kind}:{idx}"
 
 
-def render_feedback_controls(question: str, answer: str, citations: list[dict] | None):
-    """
-    Renders 👍 / 👎 feedback controls under an answer.
-    Stores feedback via POST /feedback.
-    """
+def _hash_text(value: str) -> str:
+    return hashlib.sha256((value or "").encode("utf-8")).hexdigest()[:16]
+
+
+def submit_feedback(payload: dict) -> None:
+    r = requests.post(f"{BACKEND_URL}/feedback", json=payload, timeout=20)
+    r.raise_for_status()
+
+
+def _svg_thumb_up() -> str:
+    return (
+        '<div class="sf-svg-thumb" aria-hidden="true">'
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.64l1.38-9A2 2 0 0 0 19.69 9Z"></path>'
+        '<path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>'
+        '</svg></div>'
+    )
+
+
+def _svg_thumb_down() -> str:
+    return (
+        '<div class="sf-svg-thumb" aria-hidden="true">'
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.64l-1.38 9A2 2 0 0 0 4.31 15Z"></path>'
+        '<path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>'
+        '</svg></div>'
+    )
+
+
+def render_feedback_controls(
+    question: str,
+    answer: str,
+    citations: list[dict] | None,
+    use_svg_icons: bool = False,
+):
+    """Render feedback controls and POST votes to /feedback."""
     citations = citations or []
 
-    # Stable per-question/answer key
     q_id = _hash_text(question.strip())
     a_id = _hash_text(answer.strip())
     key_prefix = f"fb_{q_id}_{a_id}"
@@ -603,55 +830,56 @@ def render_feedback_controls(question: str, answer: str, citations: list[dict] |
 
     vote = st.session_state[key_prefix]["vote"]
 
-    # Wrapper for CSS pill styling
     st.markdown('<div class="sf-feedback">', unsafe_allow_html=True)
-
     c1, c2, c3 = st.columns([1, 1, 6], vertical_alignment="center")
 
     with c1:
-        st.markdown('<div class="is-selected">' if vote == "up" else "<div>", unsafe_allow_html=True)
-        up = st.button("👍", key=f"{key_prefix}_up")
-        st.markdown("</div>", unsafe_allow_html=True)
+        if use_svg_icons:
+            st.markdown(_svg_thumb_up(), unsafe_allow_html=True)
+        st.markdown('<div class="is-selected">' if vote == "up" else '<div>', unsafe_allow_html=True)
+        up = st.button('Helpful', key=f"{key_prefix}_up", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with c2:
-        st.markdown('<div class="is-selected">' if vote == "down" else "<div>", unsafe_allow_html=True)
-        down = st.button("👎", key=f"{key_prefix}_down")
-        st.markdown("</div>", unsafe_allow_html=True)
+        if use_svg_icons:
+            st.markdown(_svg_thumb_down(), unsafe_allow_html=True)
+        st.markdown('<div class="is-selected">' if vote == "down" else '<div>', unsafe_allow_html=True)
+        down = st.button('Not helpful', key=f"{key_prefix}_down", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with c3:
-        if vote == "up":
-            st.caption("Recorded: Helpful")
-        elif vote == "down":
-            st.caption("Recorded: Not helpful")
+        if vote == 'up':
+            st.caption('Recorded: Helpful')
+        elif vote == 'down':
+            st.caption('Recorded: Not helpful')
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Handle clicks
     if up:
         payload = {
-            "vote": "up",
-            "question_id": q_id,
-            "answer_id": a_id,
-            "question": question,
-            "answer": answer,
-            "citations": citations,
+            'vote': 'up',
+            'question_id': q_id,
+            'answer_id': a_id,
+            'question': question,
+            'answer': answer,
+            'citations': citations,
         }
         submit_feedback(payload)
-        st.session_state[key_prefix]["vote"] = "up"
-        st.toast("Thanks — feedback recorded", icon="✅")
+        st.session_state[key_prefix]['vote'] = 'up'
+        st.toast('Thanks - feedback recorded')
 
     if down:
         payload = {
-            "vote": "down",
-            "question_id": q_id,
-            "answer_id": a_id,
-            "question": question,
-            "answer": answer,
-            "citations": citations,
+            'vote': 'down',
+            'question_id': q_id,
+            'answer_id': a_id,
+            'question': question,
+            'answer': answer,
+            'citations': citations,
         }
         submit_feedback(payload)
-        st.session_state[key_prefix]["vote"] = "down"
-        st.toast("Thanks — feedback recorded", icon="✅")
+        st.session_state[key_prefix]['vote'] = 'down'
+        st.toast('Thanks - feedback recorded')
 
 
 # ----------------------------
@@ -699,7 +927,7 @@ if st.sidebar.button("Rebuild Index (Ingest)", use_container_width=True):
         try:
             result = run_ingest()
             st.sidebar.success(
-                f"Indexed: {result.get('indexed_as_of')} • Chunks: {result.get('num_chunks')} • Skipped: {result.get('skipped_items')}"
+                f"Indexed: {result.get('indexed_as_of')} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Chunks: {result.get('num_chunks')} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Skipped: {result.get('skipped_items')}"
             )
             st.rerun()
         except Exception as e:
@@ -709,6 +937,11 @@ st.sidebar.divider()
 st.sidebar.caption("Tip: Prefer direct official PDFs for maximum trust and speed.")
 
 debug_enabled = st.sidebar.checkbox("DEBUG")
+use_svg_feedback = st.sidebar.checkbox(
+    "SVG feedback icons",
+    value=SVG_FEEDBACK_DEFAULT,
+    help="Show optional SVG thumbs icons for answer feedback controls.",
+)
 if debug_enabled:
     st.sidebar.markdown("**CSV Debug**")
     st.sidebar.code(str(SEED_CSV_PATH))
@@ -730,7 +963,7 @@ if debug_enabled:
 # ----------------------------
 # Tabs
 # ----------------------------
-tab1, tab2, tab3 = st.tabs(["📚 Doctrine Library", "🧰 MSC Toolkit", "💬 Ask Super Friend"])
+tab1, tab2, tab3 = st.tabs(["ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â¡ Doctrine Library", "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â§Ãƒâ€šÃ‚Â° MSC Toolkit", "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¬ Ask Super Companion"])
 
 # ----------------------------
 # Query param routing (full-row clickable)
@@ -759,7 +992,7 @@ with tab1:
 
     afi = load_afi_seed()
     if not afi:
-        st.error("Missing or empty file: frontend/content/afi41_seed.csv")
+        st.error(f"Missing or empty file: {SEED_CSV_PATH}")
         st.stop()
 
     # Search bar (clean)
@@ -780,6 +1013,8 @@ with tab1:
             or any(ql in uc.lower() for uc in (a.get("use_cases", []) or []))
         ]
 
+    render_doc_find_panel(afi, panel_key="doctrine_find")
+
     # If open token points to afi detail, render detail
     if st.session_state.open_kind == "afi" and st.session_state.open_idx is not None:
         idx = st.session_state.open_idx
@@ -787,7 +1022,7 @@ with tab1:
             a = afi[idx]
             pub = clean_text(a.get("pub"))
             title = to_sentence_case(a.get("title") or "")
-            st.markdown(f"### {pub} — {title}" if pub else f"### {title}")
+            st.markdown(f"### {pub} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â {title}" if pub else f"### {title}")
 
             why = (a.get("why_it_matters") or "").strip()
             if why:
@@ -806,7 +1041,7 @@ with tab1:
 
             render_links_as_buttons(a.get("official_links", []) or [])
 
-            if st.button("← Back to list", use_container_width=True):
+            if st.button("ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â Back to list", use_container_width=True):
                 st.session_state.open_token = ""
                 st.session_state.open_kind = ""
                 st.session_state.open_idx = None
@@ -827,7 +1062,7 @@ with tab1:
             row_class = "even" if i % 2 == 0 else "odd"
             pub = clean_text(a.get("pub"))
             title = to_sentence_case(a.get("title") or "")
-            display_title = f"{pub} — {title}" if pub else title
+            display_title = f"{pub} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â {title}" if pub else title
             summary = clean_text(a.get("why_it_matters"))
             tag_label = clean_text((a.get("tags", []) or [""])[0]) if a.get("tags") else ""
             official_links = a.get("official_links", []) or []
@@ -887,7 +1122,7 @@ with tab2:
 
     q2 = st.text_input(
         "",
-        placeholder="Search toolkit documents by title, tags, or summary…",
+        placeholder="Search toolkit documents by title, tags, or summaryÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦",
         label_visibility="collapsed",
         key="toolkit_search",
     )
@@ -899,6 +1134,8 @@ with tab2:
             or ql in (t.get("summary", "") or "").lower()
             or any(ql in tag.lower() for tag in (t.get("tags", []) or []))
         ]
+
+    render_doc_find_panel(toolkit, panel_key="toolkit_find")
 
     # Detail view
     if st.session_state.open_kind == "toolkit" and st.session_state.open_idx is not None:
@@ -918,7 +1155,7 @@ with tab2:
 
             render_links_as_buttons(t.get("official_links", []) or [])
 
-            if st.button("← Back to toolkit", use_container_width=True):
+            if st.button("ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â Back to toolkit", use_container_width=True):
                 st.session_state.open_token = ""
                 st.session_state.open_kind = ""
                 st.session_state.open_idx = None
@@ -968,11 +1205,11 @@ with tab2:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ----------------------------
-# Tab 3: Ask Super Friend
+# Tab 3: Ask Super Companion
 # ----------------------------
 with tab3:
-    st.subheader("Ask Super Friend")
-    st.caption("Citations are always shown.")
+    st.subheader("Ask Super Companion")
+    st.caption("Citations are shown when supporting evidence is retrieved.")
 
     # Welcome panel (visual polish + guidance)
     st.markdown('<div class="sf-chat-wrap">', unsafe_allow_html=True)
@@ -982,7 +1219,7 @@ with tab3:
     with st.form("ask_form"):
         question = st.text_area(
             "Question",
-            placeholder="Ask a question (e.g., 'Where can I find DHA policy on …?')",
+            placeholder="Ask a question (e.g., 'Where can I find DHA policy on ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦?')",
             height=90,
             label_visibility="collapsed",
         )
@@ -998,6 +1235,7 @@ with tab3:
         with st.spinner("Retrieving evidence and generating a grounded response..."):
             try:
                 resp = ask(question.strip(), top_k, allowed_sources=allowed or None)
+                citations = resp.get("citations", [])
 
                 left, right = st.columns([2, 1], gap="large")
 
@@ -1007,13 +1245,18 @@ with tab3:
 
                     grounded = resp.get("grounded", False)
                     st.markdown(
-                        f"**Grounded:** {'✅ Yes' if grounded else '⚠️ Insufficient evidence'}  \n"
+                        f"**Grounded:** {'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Yes' if grounded else 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Insufficient evidence'}  \n"
                         f"**Indexed as of:** {resp.get('indexed_as_of', 'unknown')}"
+                    )
+                    render_feedback_controls(
+                        question=question.strip(),
+                        answer=str(resp.get("answer", "")),
+                        citations=citations,
+                        use_svg_icons=use_svg_feedback,
                     )
 
                 with right:
                     st.markdown("### Evidence & Citations")
-                    citations = resp.get("citations", [])
                     if not citations:
                         st.caption("No citations returned.")
                     else:
@@ -1041,4 +1284,4 @@ with tab3:
 # Footer
 # ----------------------------
 st.divider()
-st.caption("Built for MSCs | Version 1.0")
+st.caption(f"{APP_VERSION}")

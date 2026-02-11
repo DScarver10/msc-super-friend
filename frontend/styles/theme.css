@@ -1,4 +1,4 @@
-/* ===== MSC Super Friend Theme ===== */
+/* ===== MSC Super Companion Theme ===== */
 
 :root{
   --bg:#F2F4F6;                 /* soft light gray background */
@@ -42,7 +42,7 @@ html, body, [class*="css"] { color: var(--text); }
   border-radius: 12px;
 }
 
-/* Ask Super Friend chat grouping */
+/* Ask Super Companion chat grouping */
 .sf-chat-container{
   border: 1px solid var(--border);
   background: #FFFFFF;
@@ -94,7 +94,7 @@ html, body, [class*="css"] { color: var(--text); }
   font-size: 12px;
 }
 
-/* Full-row clickable anchors (no “linky” behavior) */
+/* Full-row clickable anchors (no â€œlinkyâ€ behavior) */
 a.sf-rowlink{
   text-decoration: none !important;
   color: inherit !important;
@@ -186,7 +186,7 @@ a.sf-rowlink:active{ color: inherit !important; }
   border-radius: 999px;
 }
 
-/* ===== Welcome panel (Ask Super Friend) ===== */
+/* ===== Welcome panel (Ask Super Companion) ===== */
 .sf-welcome{
   border-radius: var(--cardRadius);
   padding: 16px;
@@ -346,7 +346,7 @@ a.sf-rowlink:active{ color: inherit !important; }
   color: var(--af-blue);
 }
 
-/* ===== Feedback pills (👍/👎) ===== */
+/* ===== Feedback pills (ðŸ‘/ðŸ‘Ž) ===== */
 .sf-feedback{
   display:flex;
   gap: 10px;
@@ -398,7 +398,7 @@ a.sf-rowlink:active{ color: inherit !important; }
   .sf-title, .sf-row .title{ font-size: 13px; line-height: 1.5; }
   .sf-summary, .sf-row .summary{ font-size: 11px; line-height: 1.5; }
 
-  /* chips don’t crowd */
+  /* chips donâ€™t crowd */
   .sf-tag, .sf-row .tag{ padding: 3px 6px; font-size: 11px; }
 }
 

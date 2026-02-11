@@ -1,138 +1,34 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 import os
 from pathlib import Path
 from urllib.parse import quote
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from starlette.responses import FileResponse
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from pathlib import Path
+from dotenv import load_dotenv
+import os
 
-API_DIR = Path(__file__).resolve().parent
-load_dotenv(Path(__file__).resolve().parent / ".env", override=True, encoding="utf-8-sig")
-logging.basicConfig(level=logging.INFO)
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
 
-app = FastAPI(title="MSC Super Friend API", version="0.1.0")
+# quick sanity check (remove after confirming)
+print("OPENAI_API_KEY present?", bool(os.getenv("OPENAI_API_KEY")))
+
+app = FastAPI(title="MSC Super Companion API", version="0.1.0")
 logger = logging.getLogger("api")
-
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled server error")
-    return JSONResponse(status_code=500, content={"detail": "Internal server error. Check server logs."})
-
-
-@app.on_event("startup")
-def log_resolved_paths() -> None:
-    resolved_index_dir = index_dir()
-    meta_path = resolved_index_dir / "meta.json"
-    faiss_path = resolved_index_dir / "faiss.index"
-    logger.info("Using INDEX_DIR=%s", resolved_index_dir)
-    logger.info("meta.json exists: %s (%s)", meta_path.exists(), meta_path)
-    logger.info("faiss.index exists: %s (%s)", faiss_path.exists(), faiss_path)
 
 
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
 
 
-def _env(name: str, default: str = "") -> str:
-    value = os.getenv(name)
-    if value is None:
-        # Handle UTF-8 BOM-prefixed first key in .env files.
-        value = os.getenv(f"\ufeff{name}", default)
-    return str(value).strip()
-
-
-cors_origins_raw = _env("CORS_ALLOW_ORIGINS", "*")
-cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
-if not cors_origins:
-    cors_origins = ["*"]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-def index_dir() -> Path:
-    repo_root = Path(__file__).resolve().parents[1]
-    default_index_dir = repo_root / "backend" / "data" / "index"
-    raw_index_dir = _env("INDEX_DIR")
-    if not raw_index_dir:
-        return default_index_dir.resolve()
-
-    configured = Path(raw_index_dir).expanduser()
-    if configured.is_absolute():
-        return configured.resolve()
-
-    return (repo_root / configured).resolve()
-
-
-def docs_dir() -> Path:
-    repo_root = Path(__file__).resolve().parents[1]
-    default_docs_dir = repo_root / "backend" / "data" / "toolkit_docs"
-    raw_docs_dir = _env("DOCS_DIR")
-    if not raw_docs_dir:
-        return default_docs_dir.resolve()
-
-    configured = Path(raw_docs_dir).expanduser()
-    if configured.is_absolute():
-        return configured.resolve()
-
-    return (repo_root / configured).resolve()
-
-
-def _doc_roots() -> list[Path]:
-    repo_root = Path(__file__).resolve().parents[1]
-    roots = [
-        docs_dir(),
-        (repo_root / "backend" / "data" / "toolkit_docs").resolve(),
-        (repo_root / "frontend" / "docs").resolve(),
-    ]
-    unique: list[Path] = []
-    seen: set[str] = set()
-    for root in roots:
-        key = str(root)
-        if key not in seen:
-            seen.add(key)
-            unique.append(root)
-    return unique
-
-
-def _resolve_doc_path(file_path: str) -> Path | None:
-    rel = Path(file_path)
-    if ".." in rel.parts:
-        raise HTTPException(status_code=400, detail="Invalid path")
-
-    for root in _doc_roots():
-        candidate = (root / rel).resolve()
-        if str(candidate).startswith(str(root)) and candidate.exists() and candidate.is_file():
-            return candidate
-
-        by_name = (root / rel.name).resolve()
-        if str(by_name).startswith(str(root)) and by_name.exists() and by_name.is_file():
-            return by_name
-
-        # Case-insensitive fallback for Linux hosts when source names vary in case.
-        target = rel.name.casefold()
-        if root.exists():
-            for child in root.iterdir():
-                if child.is_file() and child.name.casefold() == target:
-                    return child.resolve()
-    return None
+def _index_dir() -> Path:
+    root = Path(__file__).resolve().parents[1]
+    default = root / "backend" / "data" / "index"
+    return Path(os.getenv("INDEX_DIR", str(default))).resolve()
 
 
 def _docs_url(local_path: str | None) -> str | None:
@@ -141,16 +37,7 @@ def _docs_url(local_path: str | None) -> str | None:
     name = Path(local_path).name
     if not name:
         return None
-    _ = docs_dir() / name
     return f"/docs/{quote(name)}"
-
-
-def _citation_url(raw_url: str | None, local_path: str | None) -> str:
-    if raw_url:
-        if raw_url.startswith("local:"):
-            return f"/docs/{quote(raw_url.replace('local:', '', 1))}"
-        return raw_url
-    return _docs_url(local_path) or ""
 
 
 @app.get("/health")
@@ -158,45 +45,30 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/docs/{file_path:path}")
-def serve_docs(file_path: str):
-    resolved = _resolve_doc_path(file_path)
-    if not resolved:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    media_type = "application/pdf"
-    if resolved.suffix.lower() == ".xlsx":
-        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-    return FileResponse(path=str(resolved), media_type=media_type)
-
-
 @app.post("/ask")
 def ask(payload: AskRequest) -> dict[str, object]:
-    idx_dir = index_dir()
+    idx_dir = _index_dir()
     index_file = idx_dir / "faiss.index"
     meta_file = idx_dir / "meta.json"
 
-    if not meta_file.exists():
+    if not index_file.exists() or not meta_file.exists():
         raise HTTPException(
             status_code=503,
-            detail=f"RAG index missing. Build it first. Looked for: {meta_file}",
-        )
-    if not index_file.exists():
-        raise HTTPException(
-            status_code=503,
-            detail=f"RAG index missing. Build it first. Looked for: {index_file}",
+            detail=(
+                "RAG index is unavailable. Build it first (expected files: "
+                f"{index_file} and {meta_file})."
+            ),
         )
 
-    openai_api_key = _env("OPENAI_API_KEY")
-    if not openai_api_key:
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
         raise HTTPException(
             status_code=500,
             detail="Missing OPENAI_API_KEY. Set it in the environment before calling /ask.",
         )
 
-    llm_model = _env("LLM_MODEL", "gpt-4o-mini")
-    embedding_model = _env("EMBEDDING_MODEL", "text-embedding-3-small")
+    llm_model = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
+    embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small").strip()
 
     try:
         from backend.rag.llm import generate_grounded_answer
@@ -216,12 +88,12 @@ def ask(payload: AskRequest) -> dict[str, object]:
             index_dir=idx_dir,
             question=payload.question,
             top_k=5,
-            api_key=openai_api_key,
+            api_key=api_key,
             embedding_model=embedding_model,
         )
 
         answer = generate_grounded_answer(
-            api_key=openai_api_key,
+            api_key=api_key,
             model=llm_model,
             question=payload.question,
             evidence=evidence,
@@ -230,7 +102,7 @@ def ask(payload: AskRequest) -> dict[str, object]:
         citations = [
             {
                 "title": item.title,
-                "url": _citation_url(item.url, item.local_path),
+                "url": item.url or _docs_url(item.local_path) or "",
                 "snippet": item.excerpt,
             }
             for item in evidence
